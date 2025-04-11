@@ -11,6 +11,7 @@ import webbrowser
 
 from src.ui.tooltip import ToolTip
 from src.utils.script_metadata import parse_script_metadata
+from src.utils.message_handler import MessageHandler
 
 
 class ScriptView:
@@ -133,7 +134,7 @@ class ScriptView:
                 tags.append("has_link")
             
             self.scripts_tree.insert("", tk.END, 
-                values=(script_type, friendly_name, developer, description, undoable), 
+                values=(script_type, friendly_name, developer, description, "Yes" if undoable else "No"), 
                 tags=tags
             )
         
@@ -191,17 +192,23 @@ class ScriptView:
                 # Check if the tag looks like a URL
                 if tag.startswith(("http://", "https://", "www.")):
                     try:
-                        # Open the URL in the default browser
+                        # Open the URL in the default browser with confirmation
                         url = tag
                         if url.startswith("www."):
                             url = "http://" + url
                         
-                        print(f"Opening developer link: {url}")
-                        webbrowser.open(url)
+                        developer = self.scripts_tree.item(item, 'values')[2]
+                        if MessageHandler.confirm_url_open(
+                                url, 
+                                "Open Developer Link",
+                                f"You are about to open this developer link for {developer}:\n\n{url}\n\nWould you like to proceed?"
+                            ):
+                            print(f"Opening developer link: {url}")
+                            webbrowser.open(url)
                         break
                     except Exception as e:
                         print(f"Error opening link: {str(e)}")
-                        messagebox.showerror("Link Error", f"Failed to open the developer link: {str(e)}")
+                        MessageHandler.error(f"Failed to open the developer link: {str(e)}", "Link Error")
     
     def get_selected_script(self):
         """Get the currently selected script"""

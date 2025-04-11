@@ -70,3 +70,22 @@ class MessageHandler:
         """
         print(f"CONFIRM: {message}")
         return messagebox.askyesno(title, message)
+        
+    @staticmethod
+    def confirm_url_open(url, title="Open URL", message=None):
+        """
+        Display confirmation dialog for opening a URL
+        
+        Args:
+            url: The URL to open
+            title: The dialog title
+            message: Optional custom message (default uses the URL)
+            
+        Returns:
+            bool: True if confirmed, False otherwise
+        """
+        if message is None:
+            message = f"You are about to open this URL in your web browser:\n\n{url}\n\nWould you like to proceed?"
+            
+        print(f"URL CONFIRMATION: {url}")
+        return messagebox.askyesno(title, message)

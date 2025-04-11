@@ -498,8 +498,10 @@ class ScriptExplorer(tk.Tk):
     
     def open_patreon(self):
         """Open the Patreon page in a web browser"""
-        webbrowser.open("https://www.patreon.com/c/mikethetech")
-        print("Opening Patreon page...")
+        url = "https://www.patreon.com/c/mikethetech"
+        if MessageHandler.confirm_url_open(url, "Open Patreon"):
+            webbrowser.open(url)
+            print("Opening Patreon page...")
     
     def request_admin_elevation(self):
         """Request elevation to administrator privileges"""
