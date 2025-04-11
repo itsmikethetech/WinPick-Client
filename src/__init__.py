@@ -1,0 +1,3 @@
+"""
+WinPick package
+"""

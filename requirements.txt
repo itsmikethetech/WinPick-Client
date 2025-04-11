@@ -1,0 +1,5 @@
+# Core dependencies
+# No external dependencies required for basic functionality
+
+# Optional dependencies
+# pywin32>=228  # For advanced Windows API functionality (exe metadata, etc.)
