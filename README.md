@@ -53,7 +53,18 @@ The WinPick application provides a graphical interface for browsing, running, an
 1. **Browse Categories**: Select a category from the left panel to view available scripts
 2. **Run Scripts**: Double-click on a script to run it, or right-click for additional options
 3. **Create Scripts**: Click the "New Script" button to create a new script from a template
-4. **Console Output**: View script execution output in the console panel
+4. **Download Scripts**: Click the "Download Scripts from GitHub" button to fetch scripts from the official WinPick-Scripts repository or any other GitHub repository
+5. **Console Output**: View script execution output in the console panel
+
+### GitHub Integration
+
+WinPick features seamless GitHub integration for downloading scripts:
+
+1. **Download Scripts**: Use the "Download Scripts from GitHub" button to fetch scripts from repositories
+2. **Default Repository**: Pre-configured to download from the official [WinPick-Scripts](https://github.com/itsmikethetech/WinPick-Scripts) repository
+3. **Custom Repositories**: Specify any GitHub repository URL, branch, and directory path
+4. **Conflict Resolution**: Intelligent handling of existing files with options to overwrite or skip
+5. **Automatic Category Detection**: Downloaded scripts are automatically organized into their respective categories
 
 ### Manual Usage
 
@@ -77,6 +88,9 @@ Most scripts include undo functionality, which can be triggered with:
 ├── src/                    # Source code
 │   ├── ui/                 # User interface components
 │   └── utils/              # Utility functions
+│       ├── console_redirector/ # Console output redirection
+│       ├── github_downloader/  # GitHub integration functionality
+│       └── script_metadata/    # Script metadata parsing
 └── WindowsScripts/         # Script collection
     ├── Bloatware Removal/  # Scripts for removing bloatware
     ├── Boot Options/       # Boot configuration scripts

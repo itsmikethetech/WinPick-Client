@@ -1,5 +1,5 @@
 # Core dependencies
-# No external dependencies required for basic functionality
+requests>=2.28.0  # For GitHub downloads and network operations
 
 # Optional dependencies
 # pywin32>=228  # For advanced Windows API functionality (exe metadata, etc.)

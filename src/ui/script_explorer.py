@@ -21,6 +21,7 @@ import urllib.parse
 from src.ui.tooltip import ToolTip
 from src.utils.console_redirector import ConsoleRedirector
 from src.utils.script_metadata import parse_script_metadata, get_exe_metadata
+from src.utils.github_downloader.github_downloader import GitHubDownloader
 
 class ScriptExplorer(tk.Tk):
     def __init__(self):
@@ -215,6 +216,12 @@ class ScriptExplorer(tk.Tk):
                                         text="Check Directories", 
                                         command=self.check_and_create_directories)
         self.check_dirs_btn.pack(side=tk.RIGHT, padx=5)
+        
+        # GitHub Download button
+        self.github_btn = ttk.Button(self.controls_frame, 
+                                  text="Download Scripts from GitHub", 
+                                  command=self.download_from_github)
+        self.github_btn.pack(side=tk.RIGHT, padx=5)
         
         # New Script button
         self.new_script_btn = ttk.Button(self.controls_frame, 
@@ -924,6 +931,7 @@ class ScriptExplorer(tk.Tk):
         # Tools menu
         self.tools_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.tools_menu.add_command(label="Check/Create Directories", command=self.check_and_create_directories)
+        self.tools_menu.add_command(label="Download Scripts from GitHub", command=self.download_from_github)
         self.tools_menu.add_command(label="Clear Console", command=self.clear_console)
         self.tools_menu.add_command(label="Refresh View", command=self.refresh_view)
         self.tools_menu.add_separator()
@@ -1306,6 +1314,19 @@ class ScriptExplorer(tk.Tk):
             error_msg = f"Error detecting custom folders: {str(e)}\n{traceback.format_exc()}"
             print(f"ERROR: {error_msg}")
             return False
+            
+    def download_from_github(self):
+        """Open the GitHub download dialog"""
+        try:
+            # Initialize the GitHub downloader
+            downloader = GitHubDownloader(self, self.base_dir)
+            
+            # Show the download dialog
+            downloader.show_download_dialog()
+        except Exception as e:
+            error_msg = f"Error opening GitHub download dialog: {str(e)}\n{traceback.format_exc()}"
+            messagebox.showerror("GitHub Download Error", error_msg)
+            print(f"ERROR: {error_msg}")
 
     def install_dependencies(self, script_path):
         import re, sys, subprocess, os
