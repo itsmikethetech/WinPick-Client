@@ -1,4 +1,4 @@
-WinPick (Client): Unlock the Full Potential of Windows
+# WinPick (Client): Unlock the Full Potential of Windows
 
 Welcome to WinPick, your key to unlocking the full potential of Microsoft Windows. The name WinPick is a play on words for “Windows Lockpick”, symbolizing its ability to unlock hidden and underutilized features in Windows.
 
