@@ -19,7 +19,7 @@ def create_new_script_dialog(parent, category, category_dir, refresh_callback):
     
     dialog = tk.Toplevel(parent)
     dialog.title("Create New Script")
-    dialog.geometry("650x580")  # Larger size for better spacing
+    dialog.geometry("650x750")  # Larger size for better spacing
     dialog.transient(parent)  # Make dialog modal
     dialog.grab_set()
     dialog.configure(bg=secondary_color)

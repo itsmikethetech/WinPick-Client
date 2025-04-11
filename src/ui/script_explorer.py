@@ -31,7 +31,7 @@ class ScriptExplorer(tk.Tk):
         self.create_menu_bar()
         
         self.title("WinPick - Unlock the Potential of Windows")
-        self.geometry("1200x800")  # Increased window size
+        self.geometry("1200x900")  # Increased window size
         self.minsize(900, 600)
         
         # Set up theming with modern colors
@@ -429,10 +429,10 @@ class ScriptExplorer(tk.Tk):
     def redirect_output(self):
         sys.stdout = ConsoleRedirector(self.console_queue)
         sys.stderr = ConsoleRedirector(self.console_queue)
-        print("=== WinPick Console ===")
+        print("================== WinPick Console ==================")
         print("Console output will appear here.")
         print("Scripts will display their output in this console.")
-        print("==========================================")
+        print("=====================================================")
     
     def restore_output(self):
         sys.stdout = self.old_stdout
@@ -604,7 +604,7 @@ class ScriptExplorer(tk.Tk):
         
         dialog = tk.Toplevel(self)
         dialog.title("Script Action")
-        dialog.geometry("500x280")
+        dialog.geometry("500x500")
         dialog.transient(self)
         dialog.grab_set()
         dialog.configure(bg=self.secondary_color)
