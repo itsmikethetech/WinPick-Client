@@ -377,10 +377,17 @@ class GitHubDownloader:
                     
                     # Validate inputs
                     if not repo_url:
-                        status_var.set("Error: Repository URL is required.")
-                        download_btn.config(state="normal")
-                        cancel_btn.config(state="normal")
-                        progress_bar.stop()
+                        def update_ui_for_validation_error():
+                            try:
+                                status_var.set("Error: Repository URL is required.")
+                                download_btn.config(state="normal")
+                                cancel_btn.config(state="normal")
+                                progress_bar.stop()
+                            except tk.TclError:
+                                pass  # Dialog might have been closed
+                        
+                        # Schedule UI update on the main thread
+                        self.parent.after(0, update_ui_for_validation_error)
                         return
                     
                     if not branch:
@@ -389,34 +396,64 @@ class GitHubDownloader:
                     # Perform the download
                     success, message = self.download_repository(repo_url, dir_path, branch)
                     
-                    if success:
-                        # Show success message
-                        status_var.set("Download completed successfully!")
-                        
-                        # Schedule dialog closure after a delay
-                        self.parent.after(2000, dialog.destroy)
-                        
-                        # Update the UI to refresh the script list
-                        self.parent.refresh_view()
-                        
-                        # Show a success message
-                        messagebox.showinfo("Download Complete", message)
-                    else:
-                        # Show error message
-                        status_var.set(f"Error: {message}")
-                        download_btn.config(state="normal")
-                        cancel_btn.config(state="normal")
+                    # Use after method to safely update UI from the background thread
+                    def update_ui_on_completion():
+                        try:
+                            if success:
+                                # Show success message
+                                status_var.set("Download completed successfully!")
+                                
+                                # Schedule dialog closure after a delay
+                                dialog.after(2000, lambda: safe_destroy_dialog())
+                                
+                                # Update the UI to refresh the script list
+                                self.parent.refresh_view()
+                                
+                                # Show a success message
+                                messagebox.showinfo("Download Complete", message)
+                            else:
+                                # Show error message
+                                status_var.set(f"Error: {message}")
+                                try:
+                                    download_btn.config(state="normal")
+                                    cancel_btn.config(state="normal")
+                                except tk.TclError:
+                                    pass  # Widgets might have been destroyed
+                        except tk.TclError:
+                            pass  # Dialog might have been closed
+                    
+                    def safe_destroy_dialog():
+                        try:
+                            dialog.destroy()
+                        except tk.TclError:
+                            pass  # Dialog might already be destroyed
+                    
+                    # Schedule UI update on the main thread
+                    self.parent.after(0, update_ui_on_completion)
                 
                 except Exception as e:
                     error_msg = f"Error during download: {str(e)}\n{traceback.format_exc()}"
                     print(f"ERROR: {error_msg}")
-                    status_var.set(f"Error: {str(e)}")
-                    download_btn.config(state="normal")
-                    cancel_btn.config(state="normal")
+                    
+                    # Handle error in the main thread
+                    def update_ui_on_error():
+                        try:
+                            status_var.set(f"Error: {str(e)}")
+                            download_btn.config(state="normal")
+                            cancel_btn.config(state="normal")
+                        except tk.TclError:
+                            pass  # Dialog might have been closed
+                    
+                    # Schedule UI update on the main thread
+                    self.parent.after(0, update_ui_on_error)
                 
                 finally:
-                    # Stop the progress bar
-                    progress_bar.stop()
+                    # Stop the progress bar safely
+                    try:
+                        progress_bar.stop()
+                    except tk.TclError:
+                        # Progress bar widget might have been destroyed
+                        pass
             
             # Start the download thread
             download_thread = threading.Thread(target=download_thread)
