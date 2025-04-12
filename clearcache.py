@@ -16,39 +16,29 @@ def clear_ratings_cache():
     """Clear the local ratings cache files."""
     # Define the cache directory path
     cache_dir = os.path.join(os.path.expanduser("~"), ".winpick", "cache")
-    
-    if not os.path.exists(cache_dir):
-        print("No cache directory found. Nothing to clear.")
-        return False
+    ratings_cache_file = os.path.join(os.path.expanduser("~"), ".winpick", "script_ratings.json")
     
     try:
-        # Find all JSON files in the cache directory
-        cache_files = list(Path(cache_dir).glob("*.json"))
-        
-        if not cache_files:
-            print("No cache files found in the cache directory.")
+        # Check if the ratings cache file exists
+        if os.path.exists(ratings_cache_file):
+            # Create a backup directory
+            backup_dir = os.path.join(os.path.expanduser("~"), ".winpick", "cache_backup")
+            os.makedirs(backup_dir, exist_ok=True)
+            
+            # Copy to backup before deleting
+            backup_path = os.path.join(backup_dir, "script_ratings_backup.json")
+            shutil.copy2(ratings_cache_file, backup_path)
+            
+            # Remove the ratings cache file
+            os.remove(ratings_cache_file)
+            print(f"Cleared ratings cache file (backup created at {backup_path})")
+            
+            return True
+        else:
+            print("No ratings cache file found.")
             return False
-        
-        # Create a backup directory
-        backup_dir = os.path.join(os.path.expanduser("~"), ".winpick", "cache_backup")
-        os.makedirs(backup_dir, exist_ok=True)
-        
-        # Move files to backup instead of deleting them
-        for file_path in cache_files:
-            # Skip any non-ratings related files
-            if "ratings" in file_path.name or "stars" in file_path.name:
-                backup_path = os.path.join(backup_dir, file_path.name)
-                shutil.copy2(file_path, backup_path)
-                os.remove(file_path)
-                print(f"Cleared cache file: {file_path.name} (backup created)")
-        
-        print("\nRatings cache cleared successfully!")
-        print(f"Backup created in: {backup_dir}")
-        print("\nThe application will fetch fresh ratings data on next run.")
-        return True
-        
     except Exception as e:
-        print(f"Error clearing cache: {str(e)}")
+        print(f"Error clearing ratings cache: {str(e)}")
         return False
 
 if __name__ == "__main__":

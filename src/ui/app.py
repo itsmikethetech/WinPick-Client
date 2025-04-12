@@ -9,6 +9,7 @@ import sys
 import ctypes
 import webbrowser
 import tkinter as tk
+import shutil
 from tkinter import ttk, messagebox, PanedWindow
 
 from src.ui.ui_components import (
@@ -104,7 +105,7 @@ class ScriptExplorer(tk.Tk):
         
         # Update GitHub auth status
         self.update_github_auth_status()
-        
+    
     def setup_menu(self):
         """Set up the menu bar"""
         self.menu_bar = MenuBar(self)
@@ -116,6 +117,8 @@ class ScriptExplorer(tk.Tk):
             open_scripts_folder_callback=lambda: self.category_controller.open_scripts_folder(self.base_dir),
             import_script_callback=self.import_script,
             export_script_callback=self.export_script,
+            github_logout_callback=self.github_logout,
+            clear_ratings_cache_callback=self.clear_ratings_cache,
             exit_callback=self.quit
         )
         
@@ -134,6 +137,65 @@ class ScriptExplorer(tk.Tk):
             about_callback=self.show_about,
             patreon_callback=self.open_patreon
         )
+        
+    def github_logout(self):
+        """Log out from GitHub by clearing the token cache"""
+        if not self.github_auth.is_authenticated():
+            MessageHandler.info("You are not currently logged in to GitHub.", "GitHub Logout", console_only=False)
+            return
+            
+        if MessageHandler.confirm("Are you sure you want to log out of GitHub?", "Confirm Logout"):
+            if self.github_auth.logout():
+                MessageHandler.info("You have been logged out of GitHub.", "Logout Successful", console_only=False)
+                # Update UI to reflect logged out state
+                self.update_github_auth_status()
+                # Refresh the script view to remove ratings
+                self.refresh_view()
+            else:
+                MessageHandler.error("Failed to log out from GitHub.", "Logout Failed", console_only=False)
+
+    def clear_ratings_cache(self):
+        """Clear the ratings cache"""
+        if MessageHandler.confirm(
+            "This will clear the local ratings cache, forcing a refresh of ratings data on next interaction.\n\n"
+            "Do you want to continue?",
+            "Clear Ratings Cache"
+        ):
+            # Define the ratings cache file path
+            ratings_cache_file = os.path.join(os.path.expanduser("~"), ".winpick", "script_ratings.json")
+            
+            try:
+                # Check if the file exists
+                if os.path.exists(ratings_cache_file):
+                    # Create a backup directory
+                    backup_dir = os.path.join(os.path.expanduser("~"), ".winpick", "cache_backup")
+                    os.makedirs(backup_dir, exist_ok=True)
+                    
+                    # Copy to backup before deleting
+                    backup_path = os.path.join(backup_dir, "script_ratings_backup.json")
+                    shutil.copy2(ratings_cache_file, backup_path)
+                    
+                    # Remove the ratings cache file
+                    os.remove(ratings_cache_file)
+                    
+                    # Reset the rating system's cache
+                    if self.rating_system:
+                        self.rating_system.ratings_cache = {}
+                        self.rating_system.ratings_cache_time = {}
+                    
+                    MessageHandler.info(
+                        "Ratings cache cleared successfully!\n"
+                        f"A backup was created at: {backup_path}", 
+                        "Cache Cleared", 
+                        console_only=False
+                    )
+                    
+                    # Refresh the UI to reflect the changes
+                    self.refresh_view()
+                else:
+                    MessageHandler.info("No ratings cache file found.", "Cache Clear", console_only=False)
+            except Exception as e:
+                MessageHandler.error(f"Error clearing ratings cache: {str(e)}", "Cache Clear Error", console_only=False)
         
     def create_header_frame(self):
         """Create the header frame with logo and controls"""

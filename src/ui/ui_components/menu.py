@@ -31,7 +31,8 @@ class MenuBar:
         
     def setup_file_menu(self, new_script_callback, new_category_callback, 
                        open_scripts_folder_callback, import_script_callback, 
-                       export_script_callback, exit_callback):
+                       export_script_callback, exit_callback, 
+                       github_logout_callback=None, clear_ratings_cache_callback=None):
         """Setup the File menu with callbacks"""
         self.file_menu.add_command(label="New Script", command=new_script_callback)
         self.file_menu.add_command(label="New Category", command=new_category_callback)
@@ -39,6 +40,17 @@ class MenuBar:
         self.file_menu.add_separator()
         self.file_menu.add_command(label="Import Script", command=import_script_callback)
         self.file_menu.add_command(label="Export Selected Script", command=export_script_callback)
+        
+        # Add the new items if callbacks are provided
+        if github_logout_callback or clear_ratings_cache_callback:
+            self.file_menu.add_separator()
+            
+            if github_logout_callback:
+                self.file_menu.add_command(label="GitHub Logout", command=github_logout_callback)
+                
+            if clear_ratings_cache_callback:
+                self.file_menu.add_command(label="Clear Ratings Cache", command=clear_ratings_cache_callback)
+        
         self.file_menu.add_separator()
         self.file_menu.add_command(label="Exit", command=exit_callback)
         

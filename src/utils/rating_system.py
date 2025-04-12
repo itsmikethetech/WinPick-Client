@@ -301,12 +301,57 @@ class RatingSystem:
         
         # Check if user is authenticated
         if not self.auth_handler.is_authenticated():
-            if not self.auth_handler.authenticate():
-                messagebox.showinfo(
-                    "Authentication Required", 
-                    "You need to authenticate with GitHub to view and submit ratings."
-                )
-                return
+            # Show authentication in progress message
+            auth_in_progress = tk.Toplevel(parent)
+            auth_in_progress.title("Authentication")
+            auth_in_progress.geometry("300x150")
+            auth_in_progress.transient(parent)
+            auth_in_progress.grab_set()
+            
+            # Center on parent window
+            x = parent.winfo_x() + (parent.winfo_width() // 2) - (300 // 2)
+            y = parent.winfo_y() + (parent.winfo_height() // 2) - (150 // 2)
+            auth_in_progress.geometry(f"+{x}+{y}")
+            
+            ttk.Label(
+                auth_in_progress,
+                text="GitHub Authentication Required",
+                font=("Segoe UI", 12, "bold")
+            ).pack(pady=(20, 10))
+            
+            ttk.Label(
+                auth_in_progress,
+                text="Please authenticate with GitHub to continue."
+            ).pack(pady=5)
+            
+            progress = ttk.Progressbar(auth_in_progress, mode="indeterminate")
+            progress.pack(fill=tk.X, padx=20, pady=10)
+            progress.start()
+            
+            def authenticate_and_continue():
+                result = self.auth_handler.authenticate()
+                auth_in_progress.destroy()
+                
+                if result and self.auth_handler.is_authenticated():
+                    # Now show the rating dialog after successful authentication
+                    self._show_rating_dialog_after_auth(parent, script_info)
+                else:
+                    messagebox.showinfo(
+                        "Authentication Required", 
+                        "You need to authenticate with GitHub to view and submit ratings."
+                    )
+            
+            # Schedule authentication after dialog is shown
+            parent.after(100, authenticate_and_continue)
+            return
+        
+        # If already authenticated, show rating dialog directly
+        self._show_rating_dialog_after_auth(parent, script_info)
+
+    def _show_rating_dialog_after_auth(self, parent, script_info):
+        """Internal method to show the rating dialog after authentication"""
+        script_path = script_info['path']
+        script_name = script_info['name']
         
         # Get existing rating
         rating_info = self.get_rating(script_path, script_name)
