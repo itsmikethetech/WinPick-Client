@@ -21,6 +21,8 @@ from src.controllers import (
 from src.utils.admin_utils import is_admin, request_admin_elevation
 from src.utils.script_metadata import parse_script_metadata
 from src.utils.message_handler import MessageHandler
+from src.utils.github_auth import GitHubAuthHandler
+from src.utils.rating_system import RatingSystem
 
 
 class ScriptExplorer(tk.Tk):
@@ -77,6 +79,10 @@ class ScriptExplorer(tk.Tk):
         self.category_controller = CategoryController(self)
         self.github_controller = GitHubController(self, self.base_dir)
         
+        # Initialize GitHub authentication and rating system
+        self.github_auth = GitHubAuthHandler(self)
+        self.rating_system = RatingSystem(self.github_auth)
+        
         # Create the main layout
         self.main_frame = ttk.Frame(self)
         self.main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
@@ -95,6 +101,9 @@ class ScriptExplorer(tk.Tk):
         
         # Update the admin button based on current privileges
         self.update_admin_indicator()
+        
+        # Update GitHub auth status
+        self.update_github_auth_status()
         
     def setup_menu(self):
         """Set up the menu bar"""
@@ -116,7 +125,8 @@ class ScriptExplorer(tk.Tk):
             download_github_callback=lambda: self.github_controller.show_download_dialog(),
             clear_console_callback=lambda: self.console_view.clear_console(),
             refresh_view_callback=self.refresh_view,
-            focus_command_callback=lambda: self.console_view.focus_command_input()
+            focus_command_callback=lambda: self.console_view.focus_command_input(),
+            github_auth_callback=self.toggle_github_auth
         )
         
         # Help menu
@@ -219,7 +229,7 @@ class ScriptExplorer(tk.Tk):
         self.scripts_frame = ttk.Frame(self.right_pane)
         self.right_pane.add(self.scripts_frame, weight=2)
         
-        self.script_view = ScriptView(self.scripts_frame, primary_color=self.primary_color)
+        self.script_view = ScriptView(self.scripts_frame, primary_color=self.primary_color, rating_system=self.rating_system)
         self.script_view.frame.pack(fill=tk.BOTH, expand=True)
         
         # Connect the search functionality
@@ -251,6 +261,9 @@ class ScriptExplorer(tk.Tk):
         
         # Initialize categories
         self.category_view.initialize_categories(self.categories)
+        
+        # Initialize script view with rating system
+        self.script_view.set_rating_system(self.rating_system)
         
         # Redirect console output
         self.console_view.redirect_output()
@@ -293,6 +306,15 @@ class ScriptExplorer(tk.Tk):
                         script_type = ext.lstrip(".").upper()
                         friendly_name, description, undoable, undo_desc, developer, link = parse_script_metadata(file_path)
                         
+                        # Get rating if rating system is available
+                        rating_text = ""
+                        rating_value = None
+                        if self.rating_system:
+                            avg_rating = self.rating_system.get_average_rating(file_path, friendly_name)
+                            if avg_rating:
+                                rating_text = f"{avg_rating}/5"
+                                rating_value = avg_rating
+                        
                         # Check if search text matches any field
                         if (search_text in friendly_name.lower() or 
                             search_text in description.lower() or 
@@ -303,22 +325,29 @@ class ScriptExplorer(tk.Tk):
                                 friendly_name, 
                                 developer, 
                                 description, 
+                                rating_text,  # Add rating
                                 "Yes" if undoable else "No", 
                                 undo_desc, 
                                 file_path,
-                                link
+                                link,
+                                rating_value  # Add rating value for sorting
                             ))
         
         # Update tree with results
-        for script_type, friendly_name, developer, description, undoable, undo_desc, script_path, link in sorted(found_scripts, key=lambda x: x[1].lower()):
+        for script_type, friendly_name, developer, description, rating_text, undoable, undo_desc, script_path, link, rating_value in sorted(found_scripts, key=lambda x: x[1].lower()):
             # Add link to tags if available
             tags = [script_path, undo_desc]
             if link:
                 tags.append(link)
                 tags.append("has_link")
+            
+            # Add rating to tags if available
+            if rating_value:
+                tags.append(f"rating_{rating_value}")
+                tags.append("has_rating")
                 
             self.script_view.scripts_tree.insert("", tk.END, 
-                values=(script_type, friendly_name, developer, description, undoable), 
+                values=(script_type, friendly_name, developer, description, rating_text, undoable), 
                 tags=tags
             )
         
@@ -392,6 +421,12 @@ class ScriptExplorer(tk.Tk):
                 popup_menu.add_command(label="🔒  Undo as Administrator", 
                                       command=lambda: self.script_controller.run_script_as_admin(script_path, undo=True))
             popup_menu.add_separator()
+            
+            # Add Rate Script option
+            popup_menu.add_command(label="⭐  Rate Script", 
+                                 command=lambda: self.rating_system.show_rating_dialog(self, script_info))
+            popup_menu.add_separator()
+            
             if script_type != "exe":
                 popup_menu.add_command(label="✏️  Edit Script", 
                                       command=lambda: self.script_controller.edit_script(script_path))
@@ -456,6 +491,46 @@ class ScriptExplorer(tk.Tk):
         if command:
             self.script_controller.execute_command(command)
             self.command_entry.delete(0, tk.END)
+    
+    def toggle_github_auth(self):
+        """Toggle GitHub authentication state"""
+        if self.github_auth.is_authenticated():
+            if MessageHandler.confirm("Are you sure you want to log out of GitHub?", "Confirm Logout"):
+                if self.github_auth.logout():
+                    MessageHandler.info("You have been logged out of GitHub.", "Logout Successful", console_only=False)
+                    # Update UI to reflect logged out state
+                    self.update_github_auth_status()
+                    # Refresh the script view to remove ratings
+                    self.refresh_view()
+        else:
+            if self.github_auth.authenticate():
+                # Check if authentication was successful
+                if self.github_auth.is_authenticated():
+                    MessageHandler.info(
+                        f"Successfully authenticated as {self.github_auth.user_info['login']}",
+                        "Authentication Successful",
+                        console_only=False
+                    )
+                    # Update UI to reflect logged in state
+                    self.update_github_auth_status()
+                    # Refresh the script view to show ratings
+                    self.refresh_view()
+                else:
+                    MessageHandler.info(
+                        "GitHub authentication is pending. Please complete the process in your browser.",
+                        "Authentication Pending",
+                        console_only=False
+                    )
+
+    def update_github_auth_status(self):
+        """Update the UI to reflect GitHub authentication status"""
+        try:
+            if self.github_auth.is_authenticated():
+                self.menu_bar.update_github_auth_label(f"Sign Out ({self.github_auth.user_info['login']})")
+            else:
+                self.menu_bar.update_github_auth_label("Sign In with GitHub")
+        except Exception as e:
+            print(f"Error updating GitHub auth status: {str(e)}")
     
     def check_and_create_directories(self):
         """Check and create required directories"""
@@ -592,6 +667,7 @@ Features:
 - Undo script actions when supported
 - Advanced console output display
 - Modern user interface
+- Rate scripts and share feedback
 
 Developed by MikeTheTech
 Support me on Patreon: https://www.patreon.com/c/mikethetech

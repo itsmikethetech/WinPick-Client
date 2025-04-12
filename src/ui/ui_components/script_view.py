@@ -15,10 +15,11 @@ from src.utils.message_handler import MessageHandler
 
 
 class ScriptView:
-    def __init__(self, parent, primary_color="#4a86e8"):
+    def __init__(self, parent, primary_color="#4a86e8", rating_system=None):
         self.parent = parent
         self.primary_color = primary_color
         self.script_extensions = ['.ps1', '.py', '.bat', '.cmd', '.exe']
+        self.rating_system = rating_system
         
         # Create UI components
         self.frame = ttk.Frame(parent)
@@ -56,9 +57,10 @@ class ScriptView:
         self.scrollbar = ttk.Scrollbar(self.tree_frame)
         self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
+        # Add Rating column to the tree
         self.scripts_tree = ttk.Treeview(
             self.tree_frame, 
-            columns=("Type", "Name", "Developer", "Description", "Undoable"), 
+            columns=("Type", "Name", "Developer", "Description", "Rating", "Undoable"), 
             show="headings",
             style="Scripts.Treeview"
         )
@@ -70,11 +72,13 @@ class ScriptView:
         self.scripts_tree.heading("Name", text="Name")
         self.scripts_tree.heading("Developer", text="Developer")
         self.scripts_tree.heading("Description", text="Description")
+        self.scripts_tree.heading("Rating", text="Rating")
         self.scripts_tree.heading("Undoable", text="Undoable")
         self.scripts_tree.column("Type", width=60, anchor=tk.W)
         self.scripts_tree.column("Name", width=180, anchor=tk.W)
         self.scripts_tree.column("Developer", width=150, anchor=tk.W)
-        self.scripts_tree.column("Description", width=350, anchor=tk.W)
+        self.scripts_tree.column("Description", width=250, anchor=tk.W)
+        self.scripts_tree.column("Rating", width=80, anchor=tk.CENTER)
         self.scripts_tree.column("Undoable", width=80, anchor=tk.CENTER)
         
         # Create tooltip for the tree
@@ -90,6 +94,10 @@ class ScriptView:
         """Set callbacks for tree item interactions"""
         self.scripts_tree.bind("<Double-1>", double_click_callback)
         self.scripts_tree.bind("<Button-3>", right_click_callback)
+        
+    def set_rating_system(self, rating_system):
+        """Set the rating system for the script view"""
+        self.rating_system = rating_system
         
     def load_scripts(self, category_path, category_name):
         """Load scripts from the specified category path"""
@@ -112,29 +120,46 @@ class ScriptView:
                     if ext.lower() in self.script_extensions:
                         script_type = ext.lstrip(".").upper()
                         friendly_name, description, undoable, undo_desc, developer, link = parse_script_metadata(file_path)
+                        
+                        # Get rating if rating system is available
+                        rating_text = ""
+                        rating_value = None
+                        if self.rating_system:
+                            avg_rating = self.rating_system.get_average_rating(file_path, friendly_name)
+                            if avg_rating:
+                                rating_text = f"{avg_rating}/5"
+                                rating_value = avg_rating
+                        
                         scripts.append((
                             script_type, 
                             friendly_name, 
                             developer, 
                             description, 
+                            rating_text,  # Add rating text
                             undoable, 
                             undo_desc, 
                             file_path, 
-                            link
+                            link,
+                            rating_value  # Add rating value for sorting
                         ))
         except Exception as e:
             print(f"Error reading scripts: {str(e)}")
             
         # Add scripts to tree
-        for script_type, friendly_name, developer, description, undoable, undo_desc, script_path, link in sorted(scripts, key=lambda x: x[1].lower()):
+        for script_type, friendly_name, developer, description, rating_text, undoable, undo_desc, script_path, link, rating_value in sorted(scripts, key=lambda x: x[1].lower()):
             # Add link to tags if available
             tags = [script_path, undo_desc]
             if link:
                 tags.append(link)
                 tags.append("has_link")
             
+            # Add rating to tags if available
+            if rating_value:
+                tags.append(f"rating_{rating_value}")
+                tags.append("has_rating")
+            
             self.scripts_tree.insert("", tk.END, 
-                values=(script_type, friendly_name, developer, description, "Yes" if undoable else "No"), 
+                values=(script_type, friendly_name, developer, description, rating_text, "Yes" if undoable else "No"), 
                 tags=tags
             )
         
@@ -156,11 +181,19 @@ class ScriptView:
                     description = values[3]
                     self.tooltip.showtip(description)
                     return
-            elif column == "#5":  # Undoable column
+            elif column == "#5":  # Rating column
+                tags = self.scripts_tree.item(item, 'tags')
+                if "has_rating" in tags:
+                    self.tooltip.showtip("Click to rate this script")
+                    return
+                else:
+                    self.tooltip.showtip("No ratings yet. Click to rate this script.")
+                    return
+            elif column == "#6":  # Undoable column
                 values = self.scripts_tree.item(item, 'values')
                 tags = self.scripts_tree.item(item, 'tags')
-                if len(values) >= 5 and len(tags) >= 2:
-                    undoable = values[4]
+                if len(values) >= 6 and len(tags) >= 2:
+                    undoable = values[5]
                     undo_desc = tags[1]
                     if undoable == "Yes" and undo_desc:
                         self.tooltip.showtip(f"Undo will: {undo_desc}")
@@ -182,33 +215,39 @@ class ScriptView:
             return
             
         column = self.scripts_tree.identify_column(event.x)
-        if column != "#3":  # Developer column
-            return
-            
-        tags = self.scripts_tree.item(item, 'tags')
-        # Check if this item has a link (should be the third tag if present)
-        if len(tags) >= 3 and "has_link" in tags:
-            for tag in tags:
-                # Check if the tag looks like a URL
-                if tag.startswith(("http://", "https://", "www.")):
-                    try:
-                        # Open the URL in the default browser with confirmation
-                        url = tag
-                        if url.startswith("www."):
-                            url = "http://" + url
-                        
-                        developer = self.scripts_tree.item(item, 'values')[2]
-                        if MessageHandler.confirm_url_open(
-                                url, 
-                                "Open Developer Link",
-                                f"You are about to open this developer link for {developer}:\n\n{url}\n\nWould you like to proceed?"
-                            ):
-                            print(f"Opening developer link: {url}")
-                            webbrowser.open(url)
-                        break
-                    except Exception as e:
-                        print(f"Error opening link: {str(e)}")
-                        MessageHandler.error(f"Failed to open the developer link: {str(e)}", "Link Error")
+        
+        if column == "#3":  # Developer column
+            tags = self.scripts_tree.item(item, 'tags')
+            # Check if this item has a link (should be the third tag if present)
+            if len(tags) >= 3 and "has_link" in tags:
+                for tag in tags:
+                    # Check if the tag looks like a URL
+                    if tag.startswith(("http://", "https://", "www.")):
+                        try:
+                            # Open the URL in the default browser with confirmation
+                            url = tag
+                            if url.startswith("www."):
+                                url = "http://" + url
+                            
+                            developer = self.scripts_tree.item(item, 'values')[2]
+                            if MessageHandler.confirm_url_open(
+                                    url, 
+                                    "Open Developer Link",
+                                    f"You are about to open this developer link for {developer}:\n\n{url}\n\nWould you like to proceed?"
+                                ):
+                                print(f"Opening developer link: {url}")
+                                webbrowser.open(url)
+                            break
+                        except Exception as e:
+                            print(f"Error opening link: {str(e)}")
+                            MessageHandler.error(f"Failed to open the developer link: {str(e)}", "Link Error")
+        
+        elif column == "#5":  # Rating column
+            # Handle rating click - show rating dialog
+            if self.rating_system:
+                script_info = self.get_selected_script()
+                if script_info:
+                    self.rating_system.show_rating_dialog(self.parent, script_info)
     
     def get_selected_script(self):
         """Get the currently selected script"""
@@ -224,11 +263,16 @@ class ScriptView:
             script_path = tags[0]
             undo_desc = tags[1] if len(tags) > 1 else ""
             link = None
+            rating = None
             
             for tag in tags:
                 if tag.startswith(("http://", "https://", "www.")):
                     link = tag
-                    break
+                elif tag.startswith("rating_"):
+                    try:
+                        rating = float(tag.split('_')[1])
+                    except:
+                        pass
                     
             return {
                 'item_id': item_id,
@@ -236,10 +280,12 @@ class ScriptView:
                 'name': values[1],
                 'developer': values[2],
                 'description': values[3],
-                'undoable': values[4] == "Yes",
+                'rating': values[4] if len(values) > 4 else "",
+                'undoable': values[5] == "Yes" if len(values) > 5 else False,
                 'undo_desc': undo_desc,
                 'path': script_path,
-                'link': link
+                'link': link,
+                'rating_value': rating
             }
             
         return None

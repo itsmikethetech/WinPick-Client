@@ -26,6 +26,9 @@ class MenuBar:
         # Apply the menu bar to the parent window
         parent.config(menu=self.menu_bar)
         
+        # Keep track of the GitHub auth menu item
+        self.github_auth_item = None
+        
     def setup_file_menu(self, new_script_callback, new_category_callback, 
                        open_scripts_folder_callback, import_script_callback, 
                        export_script_callback, exit_callback):
@@ -41,7 +44,7 @@ class MenuBar:
         
     def setup_tools_menu(self, check_dirs_callback, download_github_callback, 
                         clear_console_callback, refresh_view_callback, 
-                        focus_command_callback):
+                        focus_command_callback, github_auth_callback=None):
         """Setup the Tools menu with callbacks"""
         self.tools_menu.add_command(label="Check/Create Directories", command=check_dirs_callback)
         self.tools_menu.add_command(label="Download Scripts from GitHub", command=download_github_callback)
@@ -50,7 +53,21 @@ class MenuBar:
         self.tools_menu.add_separator()
         self.tools_menu.add_command(label="Run Command", command=focus_command_callback)
         
+        # Add GitHub authentication option if callback provided
+        if github_auth_callback:
+            self.tools_menu.add_separator()
+            # Default label, will be updated later
+            self.github_auth_item = self.tools_menu.add_command(
+                label="Sign In with GitHub", 
+                command=github_auth_callback
+            )
+        
     def setup_help_menu(self, about_callback, patreon_callback):
         """Setup the Help menu with callbacks"""
         self.help_menu.add_command(label="About", command=about_callback)
         self.help_menu.add_command(label="Support on Patreon", command=patreon_callback)
+    
+    def update_github_auth_label(self, label):
+        """Update the GitHub auth menu item label"""
+        if self.github_auth_item is not None:
+            self.tools_menu.entryconfigure(self.github_auth_item, label=label)
