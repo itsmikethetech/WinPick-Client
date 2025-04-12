@@ -283,7 +283,7 @@ class GitHubDownloader:
         """Show a dialog to download scripts from GitHub"""
         dialog = tk.Toplevel(self.parent)
         dialog.title("Download Scripts from GitHub")
-        dialog.geometry("550x470")
+        dialog.geometry("550x500")
         dialog.transient(self.parent)
         dialog.grab_set()
         dialog.configure(bg=self.secondary_color)
