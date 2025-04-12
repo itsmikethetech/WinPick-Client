@@ -6,6 +6,7 @@ Dialog for creating new scripts with templates
 import os
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
+from tkinter.ttk import Scrollbar
 
 def create_new_script_dialog(parent, category, category_dir, refresh_callback):
     """Create a new script in the selected category"""
@@ -127,23 +128,42 @@ def create_new_script_dialog(parent, category, category_dir, refresh_callback):
     
     # Template Content
     template_frame = ttk.Frame(form_frame)
-    template_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+    template_frame.pack(fill=tk.BOTH, expand=True, pady=5, padx=5)
     
     ttk.Label(template_frame, 
              text="Template:", 
              font=("Segoe UI", 12, "bold"),
              foreground=primary_color).pack(anchor=tk.W, pady=(0, 5))
     
-    template_text = scrolledtext.ScrolledText(template_frame, 
-                                            width=78, 
-                                            height=15,
-                                            wrap=tk.NONE,
-                                            background=bg_light,
-                                            foreground=text_color,
-                                            insertbackground=text_color,
-                                            selectbackground=primary_color,
-                                            font=("Consolas", 10))
-    template_text.pack(fill=tk.BOTH, expand=True)
+    # Create a frame for the template with both vertical and horizontal scrollbars
+    template_container = ttk.Frame(template_frame)
+    template_container.pack(fill=tk.BOTH, expand=True)
+    
+    # Add horizontal scrollbar
+    h_scrollbar = Scrollbar(template_container, orient=tk.HORIZONTAL)
+    h_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
+    
+    # Add vertical scrollbar
+    v_scrollbar = Scrollbar(template_container, orient=tk.VERTICAL)
+    v_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    
+    # Add the template text widget with both scrollbars
+    template_text = tk.Text(template_container, 
+                          width=78, 
+                          height=15,
+                          wrap=tk.NONE,
+                          background=bg_light,
+                          foreground=text_color,
+                          insertbackground=text_color,
+                          selectbackground=primary_color,
+                          font=("Consolas", 10),
+                          xscrollcommand=h_scrollbar.set,
+                          yscrollcommand=v_scrollbar.set)
+    template_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+    
+    # Connect scrollbars to the text widget
+    h_scrollbar.config(command=template_text.xview)
+    v_scrollbar.config(command=template_text.yview)
     
     # Update template based on user input
     def update_template(*args):
@@ -279,9 +299,9 @@ pause
     
     update_template()
     
-    # Buttons
+    # Buttons with some extra padding
     button_frame = ttk.Frame(form_frame)
-    button_frame.pack(fill=tk.X, pady=(20, 0))
+    button_frame.pack(fill=tk.X, pady=(20, 10), padx=5)
     
     def create_script():
         name = script_name_var.get().strip()
@@ -326,4 +346,12 @@ pause
                            command=create_script)
     create_btn.pack(side=tk.RIGHT, padx=5)
     
+    # The script already has scrollbars for the template text area
+    # but we don't need a full scrollable canvas for the entire dialog
+    # since we've addressed scrolling needs in the template area
+    
+    # Remove the problematic event binding that was causing errors
+    # dialog.bind("<Configure>", on_dialog_configure)
+    
+    # Set focus to the script name entry
     script_name_entry.focus_set()

@@ -5,6 +5,7 @@ Handles the script list display and interactions
 """
 
 import os
+import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
 import webbrowser
@@ -100,71 +101,117 @@ class ScriptView:
         self.rating_system = rating_system
         
     def load_scripts(self, category_path, category_name):
-        """Load scripts from the specified category path"""
-        self.scripts_label.config(text=f"Scripts - {category_name}")
+        """Load scripts from the specified category path asynchronously"""
+        # Update the UI immediately for better responsiveness
+        self.scripts_label.config(text=f"Scripts - {category_name} (Loading...)")
         
         # Clear existing items
         for item in self.scripts_tree.get_children():
             self.scripts_tree.delete(item)
             
-        # Ensure directory exists
-        os.makedirs(category_path, exist_ok=True)
+        # Insert a temporary loading indicator
+        self.scripts_tree.insert("", tk.END, 
+            values=("...", "Loading scripts...", "", "Please wait...", "", ""), 
+            tags=["loading_indicator"]
+        )
+            
+        # Start loading scripts in a background thread
+        threading.Thread(
+            target=self._load_scripts_async,
+            args=(category_path, category_name),
+            daemon=True
+        ).start()
         
-        # Load and sort scripts
-        scripts = []
+        # Return immediately to keep UI responsive
+        return 0
+        
+    def _load_scripts_async(self, category_path, category_name):
+        """Async worker for loading scripts"""
         try:
-            for file in os.listdir(category_path):
-                file_path = os.path.join(category_path, file)
-                if os.path.isfile(file_path):
-                    _, ext = os.path.splitext(file)
-                    if ext.lower() in self.script_extensions:
-                        script_type = ext.lstrip(".").upper()
-                        friendly_name, description, undoable, undo_desc, developer, link = parse_script_metadata(file_path)
+            # Ensure directory exists
+            os.makedirs(category_path, exist_ok=True)
+            
+            # Load and sort scripts
+            scripts = []
+            try:
+                for file in os.listdir(category_path):
+                    file_path = os.path.join(category_path, file)
+                    if os.path.isfile(file_path):
+                        _, ext = os.path.splitext(file)
+                        if ext.lower() in self.script_extensions:
+                            script_type = ext.lstrip(".").upper()
+                            friendly_name, description, undoable, undo_desc, developer, link = parse_script_metadata(file_path)
+                            
+                            # Get rating if rating system is available
+                            rating_text = ""
+                            rating_value = None
+                            if self.rating_system:
+                                avg_rating = self.rating_system.get_average_rating(file_path, friendly_name)
+                                if avg_rating:
+                                    rating_text = f"{avg_rating}/5"
+                                    rating_value = avg_rating
+                            
+                            scripts.append((
+                                script_type, 
+                                friendly_name, 
+                                developer, 
+                                description, 
+                                rating_text,  # Add rating text
+                                undoable, 
+                                undo_desc, 
+                                file_path, 
+                                link,
+                                rating_value  # Add rating value for sorting
+                            ))
+            except Exception as e:
+                print(f"Error reading scripts: {str(e)}")
+                
+            # Sort scripts by name
+            sorted_scripts = sorted(scripts, key=lambda x: x[1].lower())
+            
+            # Clear loading indicator and update UI in the main thread
+            def update_ui():
+                try:
+                    # Clear the tree including loading indicator
+                    for item in self.scripts_tree.get_children():
+                        self.scripts_tree.delete(item)
+                    
+                    # Update label to show we're done loading
+                    self.scripts_label.config(text=f"Scripts - {category_name}")
+                    
+                    # Add scripts to tree
+                    for script_data in sorted_scripts:
+                        script_type, friendly_name, developer, description, rating_text, undoable, undo_desc, script_path, link, rating_value = script_data
                         
-                        # Get rating if rating system is available
-                        rating_text = ""
-                        rating_value = None
-                        if self.rating_system:
-                            avg_rating = self.rating_system.get_average_rating(file_path, friendly_name)
-                            if avg_rating:
-                                rating_text = f"{avg_rating}/5"
-                                rating_value = avg_rating
+                        # Add link to tags if available
+                        tags = [script_path, undo_desc]
+                        if link:
+                            tags.append(link)
+                            tags.append("has_link")
                         
-                        scripts.append((
-                            script_type, 
-                            friendly_name, 
-                            developer, 
-                            description, 
-                            rating_text,  # Add rating text
-                            undoable, 
-                            undo_desc, 
-                            file_path, 
-                            link,
-                            rating_value  # Add rating value for sorting
-                        ))
+                        # Add rating to tags if available
+                        if rating_value:
+                            tags.append(f"rating_{rating_value}")
+                            tags.append("has_rating")
+                        
+                        self.scripts_tree.insert("", tk.END, 
+                            values=(script_type, friendly_name, developer, description, rating_text, "Yes" if undoable else "No"), 
+                            tags=tags
+                        )
+                        
+                    print(f"Loaded {len(sorted_scripts)} scripts in {category_name}")
+                except Exception as e:
+                    print(f"Error updating script UI: {str(e)}")
+            
+            # Schedule UI update on main thread
+            self.parent.after(0, update_ui)
+            
         except Exception as e:
-            print(f"Error reading scripts: {str(e)}")
-            
-        # Add scripts to tree
-        for script_type, friendly_name, developer, description, rating_text, undoable, undo_desc, script_path, link, rating_value in sorted(scripts, key=lambda x: x[1].lower()):
-            # Add link to tags if available
-            tags = [script_path, undo_desc]
-            if link:
-                tags.append(link)
-                tags.append("has_link")
-            
-            # Add rating to tags if available
-            if rating_value:
-                tags.append(f"rating_{rating_value}")
-                tags.append("has_rating")
-            
-            self.scripts_tree.insert("", tk.END, 
-                values=(script_type, friendly_name, developer, description, rating_text, "Yes" if undoable else "No"), 
-                tags=tags
-            )
-        
-        print(f"Found {len(scripts)} scripts in {category_name}")
-        return len(scripts)
+            error_msg = f"Error loading scripts: {str(e)}"
+            print(f"ERROR: {error_msg}")
+            # Update UI to show error
+            self.parent.after(0, lambda: self.scripts_label.config(text=f"Scripts - {category_name} (Error loading)"))
+            self.parent.after(0, lambda: MessageHandler.error(error_msg, "Script Loading Error"))
         
     def filter_scripts(self, event=None):
         """Filter scripts based on search text"""
@@ -174,6 +221,12 @@ class ScriptView:
         """Show tooltips for tree items"""
         item = self.scripts_tree.identify_row(event.y)
         if item:
+            # Check if this is the loading indicator
+            tags = self.scripts_tree.item(item, 'tags')
+            if "loading_indicator" in tags:
+                self.tooltip.showtip("Loading scripts, please wait...")
+                return
+                
             column = self.scripts_tree.identify_column(event.x)
             if column == "#4":  # Description column
                 values = self.scripts_tree.item(item, 'values')

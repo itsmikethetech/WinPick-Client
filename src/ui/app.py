@@ -418,14 +418,18 @@ class ScriptExplorer(tk.Tk):
 
     # Event Handlers
     def on_category_select(self, event):
-        """Handle category selection"""
+        """Handle category selection - immediately show selected category
+        and load scripts asynchronously"""
+        # Immediately get the selected category for responsiveness
         category_path, category_name = self.category_view.get_selected_category()
         if not category_path or not category_name:
             return
             
-        # Load scripts for this category
-        num_scripts = self.script_view.load_scripts(category_path, category_name)
-        print(f"Loaded {num_scripts} scripts from category: {category_name}")
+        # Start loading scripts (this is now asynchronous and will return immediately)
+        self.script_view.load_scripts(category_path, category_name)
+        
+        # Log that we've started loading (actual script count will be logged when loading completes)
+        print(f"Loading scripts from category: {category_name}")
         
     def on_script_double_click(self, event):
         """Handle script double-click event"""
@@ -658,7 +662,7 @@ class ScriptExplorer(tk.Tk):
             MessageHandler.error(error_msg)
     
     def show_about(self):
-        """Show the about dialog"""
+        """Show the about dialog with scrollable content"""
         about_window = tk.Toplevel(self)
         about_window.title("About WinPick")
         about_window.geometry("600x500")
@@ -671,8 +675,35 @@ class ScriptExplorer(tk.Tk):
         y = self.winfo_y() + (self.winfo_height() // 2) - (500 // 2)
         about_window.geometry(f"+{x}+{y}")
         
-        frame = ttk.Frame(about_window, padding=20)
-        frame.pack(fill=tk.BOTH, expand=True)
+        # Create a main canvas with scrollbar for the entire dialog
+        main_canvas = tk.Canvas(about_window, bg=self.secondary_color)
+        main_scrollbar = ttk.Scrollbar(about_window, orient=tk.VERTICAL, command=main_canvas.yview)
+        main_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        main_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        main_canvas.configure(yscrollcommand=main_scrollbar.set)
+        
+        # Create a frame inside the canvas that will be scrollable
+        frame = ttk.Frame(main_canvas, padding=20)
+        frame_window = main_canvas.create_window((0, 0), window=frame, anchor=tk.NW, tags="frame")
+        
+        # Configure the scrolling behavior
+        def configure_scroll_region(event):
+            main_canvas.configure(scrollregion=main_canvas.bbox("all"))
+        
+        frame.bind("<Configure>", configure_scroll_region)
+        
+        # Bind mouse wheel to scrolling
+        def on_mousewheel(event):
+            main_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        
+        main_canvas.bind_all("<MouseWheel>", on_mousewheel)
+        
+        # Adjust the canvas size when the window is resized
+        def on_window_configure(event):
+            # Update the width of the canvas window
+            main_canvas.itemconfig(frame_window, width=event.width-20)
+        
+        about_window.bind("<Configure>", on_window_configure)
         
         # Logo and title
         header_frame = ttk.Frame(frame)
@@ -700,7 +731,7 @@ class ScriptExplorer(tk.Tk):
         version_frame.pack(fill=tk.X, pady=(0, 20))
         
         ttk.Label(version_frame, 
-                text="Version 25.4.11",
+                text="Version 25.4.12", # Updated version number
                 font=("Segoe UI", 10, "bold")).pack(side=tk.LEFT)
         
         ttk.Label(version_frame,
@@ -730,6 +761,7 @@ Features:
 - Advanced console output display
 - Modern user interface
 - Rate scripts and share feedback
+- Asynchronous loading for improved responsiveness
 
 Developed by MikeTheTech
 Support me on Patreon: https://www.patreon.com/c/mikethetech
@@ -750,6 +782,17 @@ Support me on Patreon: https://www.patreon.com/c/mikethetech
                 text="OK", 
                 width=15,
                 command=about_window.destroy).pack(side=tk.LEFT, padx=5)
+        
+        # Make sure we initialize the scroll region
+        frame.update_idletasks()
+        main_canvas.configure(scrollregion=main_canvas.bbox("all"))
+        
+        # Remove mousewheel binding when the window is closed
+        def on_close():
+            main_canvas.unbind_all("<MouseWheel>")
+            about_window.destroy()
+            
+        about_window.protocol("WM_DELETE_WINDOW", on_close)
     
     def __del__(self):
         """Cleanup when the app is being destroyed"""
