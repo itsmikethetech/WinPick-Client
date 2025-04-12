@@ -15,6 +15,7 @@ import re
 import threading
 import queue
 import webbrowser
+import time
 from PIL import Image, ImageTk
 import urllib.parse
 
@@ -332,8 +333,10 @@ class ScriptExplorer(tk.Tk):
         self.scripts_tree.bind("<Button-3>", self.on_script_right_click)
         self.scripts_tree.bind("<Button-1>", self.on_script_click)
         
-        # Configure tag for items with a developer link
+        # Configure tag for items with a developer link and special states
         # self.scripts_tree.tag_configure("has_link", foreground=self.primary_color)
+        self.scripts_tree.tag_configure("loading", background="#f5f5f5")
+        self.scripts_tree.tag_configure("error", background="#fff0f0", foreground="#cc0000")
         
         # Console frame
         self.console_frame = ttk.Frame(self.right_pane)
@@ -378,40 +381,90 @@ class ScriptExplorer(tk.Tk):
                 self.on_category_select(None)
             return
         
-        # Search across all categories
+        # Show a loading indicator
+        self.scripts_label.config(text=f"Searching for '{search_text}'...")
+        loading_id = self.scripts_tree.insert("", tk.END, 
+                                            values=("...", "Searching...", "", f"Searching for '{search_text}'", ""), 
+                                            tags=("loading",))
+        self.update_idletasks()
+        
+        # Run the search in a background thread
+        threading.Thread(target=self._search_scripts_async, 
+                        args=(search_text,),
+                        daemon=True).start()
+    
+    def _search_scripts_async(self, search_text):
+        """Search for scripts asynchronously"""
         found_scripts = []
         
-        for category in self.categories:
-            category_path = os.path.join(self.base_dir, category)
-            if not os.path.exists(category_path):
-                continue
-                
-            for file in os.listdir(category_path):
-                file_path = os.path.join(category_path, file)
-                if os.path.isfile(file_path):
-                    _, ext = os.path.splitext(file)
-                    if ext.lower() in self.script_extensions:
-                        script_type = ext.lstrip(".").upper()
-                        friendly_name, description, undoable, undo_desc, developer, link = parse_script_metadata(file_path)
-                        
-                        # Check if search text matches any field
-                        if (search_text in friendly_name.lower() or 
-                            search_text in description.lower() or 
-                            search_text in developer.lower()):
+        try:
+            # Search across all categories
+            for category in self.categories:
+                category_path = os.path.join(self.base_dir, category)
+                if not os.path.exists(category_path):
+                    continue
+                    
+                for file in os.listdir(category_path):
+                    file_path = os.path.join(category_path, file)
+                    if os.path.isfile(file_path):
+                        _, ext = os.path.splitext(file)
+                        if ext.lower() in self.script_extensions:
+                            script_type = ext.lstrip(".").upper()
+                            friendly_name, description, undoable, undo_desc, developer, link = parse_script_metadata(file_path)
                             
-                            found_scripts.append((
-                                script_type, 
-                                friendly_name, 
-                                developer, 
-                                description, 
-                                undoable, 
-                                undo_desc, 
-                                file_path,
-                                link
-                            ))
+                            # Check if search text matches any field
+                            if (search_text in friendly_name.lower() or 
+                                search_text in description.lower() or 
+                                search_text in developer.lower()):
+                                
+                                found_scripts.append((
+                                    script_type, 
+                                    friendly_name, 
+                                    developer, 
+                                    description, 
+                                    undoable, 
+                                    undo_desc, 
+                                    file_path,
+                                    link
+                                ))
+        except Exception as e:
+            error_msg = f"Error searching scripts: {str(e)}\n{traceback.format_exc()}"
+            print(f"ERROR: {error_msg}")
+            # Update UI on main thread
+            self.after(0, lambda: self._show_search_error(search_text, error_msg))
+            return
         
-        # Update tree with results
-        for script_type, friendly_name, developer, description, undoable, undo_desc, script_path, link in sorted(found_scripts, key=lambda x: x[1].lower()):
+        # Sort results
+        sorted_results = sorted(found_scripts, key=lambda x: x[1].lower())
+        
+        # Update UI on main thread
+        self.after(0, lambda: self._update_search_results(search_text, sorted_results))
+    
+    def _show_search_error(self, search_text, error_msg):
+        """Display search error in the scripts tree"""
+        # Remove loading indicator
+        for item in self.scripts_tree.get_children():
+            self.scripts_tree.delete(item)
+        
+        # Update label
+        self.scripts_label.config(text=f"Search Error: '{search_text}'")
+        
+        # Insert error message
+        self.scripts_tree.insert("", tk.END, 
+                                values=("ERROR", "Search failed", "", error_msg, ""), 
+                                tags=("error",))
+    
+    def _update_search_results(self, search_text, found_scripts):
+        """Update the scripts tree with search results"""
+        # Remove loading indicator
+        for item in self.scripts_tree.get_children():
+            self.scripts_tree.delete(item)
+        
+        # Update label
+        self.scripts_label.config(text=f"Search Results: {len(found_scripts)} scripts")
+        
+        # Populate with results
+        for script_type, friendly_name, developer, description, undoable, undo_desc, script_path, link in found_scripts:
             # Add link to tags if available
             tags = [script_path, undo_desc]
             if link:
@@ -423,7 +476,6 @@ class ScriptExplorer(tk.Tk):
                 tags=tags
             )
         
-        self.scripts_label.config(text=f"Search Results: {len(found_scripts)} scripts")
         print(f"Found {len(found_scripts)} scripts matching '{search_text}'")
             
     def redirect_output(self):
@@ -498,12 +550,37 @@ class ScriptExplorer(tk.Tk):
         item_id = selected_items[0]
         category_path = self.category_tree.item(item_id, 'values')[0]
         category_name = self.category_tree.item(item_id, 'text')
-        self.scripts_label.config(text=f"Scripts - {category_name}")
+        
+        # Update the label immediately
+        self.scripts_label.config(text=f"Scripts - {category_name} (Loading...)")
+        
+        # Clear the scripts tree immediately
         for item in self.scripts_tree.get_children():
             self.scripts_tree.delete(item)
+        
+        # Make sure the category folder exists
         os.makedirs(category_path, exist_ok=True)
+        
+        # Create a loading indicator in the scripts tree
+        loading_id = self.scripts_tree.insert("", tk.END, 
+                                             values=("...", "Loading scripts...", "", "Please wait while scripts are loaded", ""), 
+                                             tags=("loading",))
+        self.scripts_tree.see(loading_id)
+        
+        # Force the UI to update immediately
+        self.update_idletasks()
+        
+        # Load scripts in a separate thread
+        threading.Thread(target=self._load_scripts_async, 
+                         args=(category_path, category_name),
+                         daemon=True).start()
+    
+    def _load_scripts_async(self, category_path, category_name):
+        """Load scripts asynchronously in a background thread"""
         scripts = []
+        
         try:
+            # Scan the directory for scripts
             for file in os.listdir(category_path):
                 file_path = os.path.join(category_path, file)
                 if os.path.isfile(file_path):
@@ -513,8 +590,43 @@ class ScriptExplorer(tk.Tk):
                         friendly_name, description, undoable, undo_desc, developer, link = parse_script_metadata(file_path)
                         scripts.append((script_type, friendly_name, developer, description, undoable, undo_desc, file_path, link))
         except Exception as e:
-            print(f"Error reading scripts: {str(e)}")
-        for script_type, friendly_name, developer, description, undoable, undo_desc, script_path, link in sorted(scripts, key=lambda x: x[1].lower()):
+            error_msg = f"Error reading scripts: {str(e)}\n{traceback.format_exc()}"
+            print(error_msg)
+            # Schedule UI update on main thread
+            self.after(0, lambda: self._show_loading_error(category_name, error_msg))
+            return
+        
+        # Sort scripts by name
+        sorted_scripts = sorted(scripts, key=lambda x: x[1].lower())
+        
+        # Schedule UI update on main thread
+        self.after(0, lambda: self._update_scripts_tree(sorted_scripts, category_name))
+    
+    def _show_loading_error(self, category_name, error_msg):
+        """Display loading error in the scripts tree"""
+        # Remove loading indicator
+        for item in self.scripts_tree.get_children():
+            self.scripts_tree.delete(item)
+        
+        # Update label
+        self.scripts_label.config(text=f"Scripts - {category_name} (Error)")
+        
+        # Insert error message
+        self.scripts_tree.insert("", tk.END, 
+                               values=("ERROR", "Failed to load scripts", "", error_msg, ""), 
+                               tags=("error",))
+    
+    def _update_scripts_tree(self, scripts, category_name):
+        """Update the scripts tree with loaded scripts"""
+        # Remove loading indicator
+        for item in self.scripts_tree.get_children():
+            self.scripts_tree.delete(item)
+        
+        # Update label
+        self.scripts_label.config(text=f"Scripts - {category_name}")
+        
+        # Populate with scripts
+        for script_type, friendly_name, developer, description, undoable, undo_desc, script_path, link in scripts:
             # Add link to tags if available
             tags = [script_path, undo_desc]
             if link:
@@ -525,6 +637,7 @@ class ScriptExplorer(tk.Tk):
                 values=(script_type, friendly_name, developer, description, undoable), 
                 tags=tags
             )
+        
         print(f"Found {len(scripts)} scripts in {category_name}")
     
     def show_tooltip(self, event):
@@ -1273,23 +1386,57 @@ class ScriptExplorer(tk.Tk):
     
     def refresh_view(self):
         try:
+            # Show refreshing indicator in scripts tree
+            self.scripts_label.config(text="Scripts - Refreshing view...")
+            for item in self.scripts_tree.get_children():
+                self.scripts_tree.delete(item)
+            
+            loading_id = self.scripts_tree.insert("", tk.END, 
+                                               values=("...", "Refreshing view...", "", "Please wait while the view is refreshed", ""), 
+                                               tags=("loading",))
+            self.update_idletasks()
+            
+            # Store the current selection
             current_selection = None
             selected_items = self.category_tree.selection()
             if selected_items:
                 current_selection = self.category_tree.item(selected_items[0], 'text')
-            self._initialize_categories()
-            if current_selection:
-                for item_id in self.category_tree.get_children():
-                    if self.category_tree.item(item_id, 'text') == current_selection:
-                        self.category_tree.selection_set(item_id)
-                        self.category_tree.see(item_id)
-                        self.on_category_select(None)
-                        break
-            elif self.category_tree.get_children():
-                first_item = self.category_tree.get_children()[0]
-                self.category_tree.selection_set(first_item)
-                self.on_category_select(None)
-            print("View refreshed")
+            
+            # Run the refresh in a background thread
+            threading.Thread(target=self._refresh_view_async, 
+                            args=(current_selection,),
+                            daemon=True).start()
+        except Exception as e:
+            error_msg = f"Error refreshing view: {str(e)}\n{traceback.format_exc()}"
+            print(f"ERROR: {error_msg}")
+    
+    def _refresh_view_async(self, current_selection):
+        """Refresh categories asynchronously"""
+        try:
+            # Initialize categories (this is quick)
+            self.after(0, self._initialize_categories)
+            
+            # Small delay to let UI update
+            time.sleep(0.1)
+            
+            # Now select the appropriate category
+            def select_category():
+                if current_selection:
+                    for item_id in self.category_tree.get_children():
+                        if self.category_tree.item(item_id, 'text') == current_selection:
+                            self.category_tree.selection_set(item_id)
+                            self.category_tree.see(item_id)
+                            self.on_category_select(None)
+                            break
+                elif self.category_tree.get_children():
+                    first_item = self.category_tree.get_children()[0]
+                    self.category_tree.selection_set(first_item)
+                    self.on_category_select(None)
+                print("View refreshed")
+            
+            # Schedule the selection on the main thread
+            self.after(0, select_category)
+            
         except Exception as e:
             error_msg = f"Error refreshing view: {str(e)}\n{traceback.format_exc()}"
             print(f"ERROR: {error_msg}")

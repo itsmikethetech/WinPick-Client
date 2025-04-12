@@ -117,10 +117,22 @@ class GitHubDownloader:
                 dest_dir = os.path.join(self.base_dir, rel_path) if rel_path != '.' else self.base_dir
                 os.makedirs(dest_dir, exist_ok=True)
                 
+                # Check if we're using the default repo or a custom one
+                default_repo = "https://github.com/itsmikethetech/WinPick-Scripts"
+                is_default_repo = repo_url.strip('/').lower() == default_repo.lower()
+                
                 # Copy all files, asking for overwrite confirmation if needed
                 for file in files:
                     src_file = os.path.join(root, file)
-                    dest_file = os.path.join(dest_dir, file)
+                    
+                    # If using a custom repo, add the username and repo name as a prefix to the script name
+                    if not is_default_repo:
+                        # Use username and repository as prefix
+                        base_filename, file_ext = os.path.splitext(file)
+                        prefixed_filename = f"{username.lower()}-{repository.lower()}-{base_filename}{file_ext}"
+                        dest_file = os.path.join(dest_dir, prefixed_filename)
+                    else:
+                        dest_file = os.path.join(dest_dir, file)
                     
                     if os.path.exists(dest_file) and not overwrite_all and not skip_all:
                         # File already exists, ask for confirmation
@@ -271,14 +283,14 @@ class GitHubDownloader:
         """Show a dialog to download scripts from GitHub"""
         dialog = tk.Toplevel(self.parent)
         dialog.title("Download Scripts from GitHub")
-        dialog.geometry("550x430")
+        dialog.geometry("550x470")
         dialog.transient(self.parent)
         dialog.grab_set()
         dialog.configure(bg=self.secondary_color)
         
         # Center dialog on parent window
         x = self.parent.winfo_x() + (self.parent.winfo_width() // 2) - (550 // 2)
-        y = self.parent.winfo_y() + (self.parent.winfo_height() // 2) - (400 // 2)
+        y = self.parent.winfo_y() + (self.parent.winfo_height() // 2) - (470 // 2)
         dialog.geometry(f"+{x}+{y}")
         
         frame = ttk.Frame(dialog, padding=20)
@@ -337,7 +349,10 @@ class GitHubDownloader:
         help_text = ttk.Label(help_frame, 
                              text="This will download scripts from the specified GitHub repository and directory.\n\n"
                                   "The default URL and directory are set to download the WindowsScripts directory from\n"
-                                  "the official WinPick-Scripts repository, which contains recommended scripts.",
+                                  "the official WinPick-Scripts repository, which contains recommended scripts.\n\n"
+                                  "Note: If you use a custom repository (not the default), script files will be\n"
+                                  "downloaded with the username and repository name as a prefix\n"
+                                  "(e.g., 'username-repo-scriptname.py').",
                              wraplength=500,
                              justify=tk.LEFT)
         help_text.pack(anchor=tk.W)
