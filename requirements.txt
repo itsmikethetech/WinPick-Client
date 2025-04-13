@@ -1,5 +1,11 @@
 # Core dependencies
 requests>=2.28.0  # For GitHub downloads and network operations
+Flask>=2.2.0      # Web server
+Flask-WTF>=1.0.0  # Form handling
+Werkzeug>=2.2.0   # Web utilities
+Jinja2>=3.0.0     # Templating engine
+itsdangerous>=2.0.0  # Session/cookie security
+click>=8.0.0      # CLI utilities
 
 # Optional dependencies
 # pywin32>=228  # For advanced Windows API functionality (exe metadata, etc.)

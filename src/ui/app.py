@@ -31,20 +31,39 @@ class ScriptExplorer(tk.Tk):
         super().__init__()
         
         self.title("WinPick - Unlock the Potential of Windows")
-        self.geometry("1200x900")  # Increased window size
-        self.minsize(900, 600)
+        self.geometry("1200x900")  # Default window size
+        self.minsize(800, 500)  # Smaller minimum size for better compatibility
         
-        # Set up styling
+        # Set up styling with modern design
         self.style_manager = AppStyle()
         self.style = self.style_manager.apply_style(self)
         
         # Get color scheme for reuse
         self.primary_color = self.style_manager.primary_color
+        self.primary_light = self.style_manager.primary_light
+        self.primary_dark = self.style_manager.primary_dark
         self.secondary_color = self.style_manager.secondary_color
         self.accent_color = self.style_manager.accent_color
         self.text_color = self.style_manager.text_color
+        self.text_secondary = self.style_manager.text_secondary
         self.bg_dark = self.style_manager.bg_dark
         self.bg_light = self.style_manager.bg_light
+        self.card_bg = self.style_manager.card_bg
+        self.border_color = self.style_manager.border_color
+        self.success_color = self.style_manager.success_color
+        self.warning_color = self.style_manager.warning_color
+        self.error_color = self.style_manager.error_color
+        
+        # Get font information
+        self.font_family = self.style_manager.font_family
+        self.font_size_small = self.style_manager.font_size_small
+        self.font_size_normal = self.style_manager.font_size_normal
+        self.font_size_large = self.style_manager.font_size_large
+        self.font_size_xlarge = self.style_manager.font_size_xlarge
+        
+        # Setup responsive layout
+        self.bind("<Configure>", self.on_window_resize)
+        self.is_small_screen = False  # Track if we're in small screen mode
         
         # Define script categories
         self.categories = [
@@ -199,39 +218,50 @@ class ScriptExplorer(tk.Tk):
         
     def create_header_frame(self):
         """Create the header frame with logo and controls"""
-        self.header_frame = ttk.Frame(self.main_frame)
-        self.header_frame.pack(fill=tk.X, side=tk.TOP, pady=(0, 10))
+        self.header_frame = ttk.Frame(self.main_frame, style="Card.TFrame")
+        self.header_frame.pack(fill=tk.X, side=tk.TOP, pady=(0, 16), padx=8)
         
-        # Left side - App title and logo
-        self.title_frame = ttk.Frame(self.header_frame)
-        self.title_frame.pack(side=tk.LEFT, fill=tk.Y)
+        # Left side - App title and logo with modern typography
+        self.title_frame = ttk.Frame(self.header_frame, style="Card.TFrame")
+        self.title_frame.pack(side=tk.LEFT, fill=tk.Y, padx=8, pady=8)
         
         self.app_title = ttk.Label(self.title_frame, 
                                   text="WinPick", 
-                                  font=("Segoe UI", 20, "bold"),
-                                  foreground=self.primary_color)
+                                  font=(self.font_family, 24, "bold"),
+                                  foreground=self.primary_color,
+                                  style="Heading.TLabel",
+                                  background=self.card_bg)
         self.app_title.pack(side=tk.LEFT, padx=5)
         
         self.app_subtitle = ttk.Label(self.title_frame,
                                      text="Unlock the Potential of Windows",
-                                     font=("Segoe UI", 12))
+                                     font=(self.font_family, self.font_size_large),
+                                     foreground=self.text_secondary,
+                                     background=self.card_bg)
         self.app_subtitle.pack(side=tk.LEFT, padx=5)
         
-        # Right side - Button controls
-        self.controls_frame = ttk.Frame(self.header_frame)
-        self.controls_frame.pack(side=tk.RIGHT, fill=tk.Y)
+        # Right side - Button controls with modern styling
+        self.controls_frame = ttk.Frame(self.header_frame, style="Card.TFrame")
+        self.controls_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=8, pady=8)
         
-        # Heart icon for Patreon
+        # Create flexible sub-frames for button organization that can reflow
+        self.button_row1 = ttk.Frame(self.controls_frame, style="Card.TFrame")
+        self.button_row1.pack(side=tk.TOP, fill=tk.X, pady=(0, 4))
+        
+        self.button_row2 = ttk.Frame(self.controls_frame, style="Card.TFrame")
+        self.button_row2.pack(side=tk.TOP, fill=tk.X)
+        
+        # Heart icon for Patreon with smoother design
         try:
-            # Create a heart icon (can be replaced with a proper image file)
-            heart_canvas = tk.Canvas(self.controls_frame, width=30, height=30, 
-                                    bg=self.secondary_color, highlightthickness=0)
-            heart_canvas.pack(side=tk.RIGHT, padx=5)
+            # Create a heart icon with transparent background
+            heart_canvas = tk.Canvas(self.button_row1, width=32, height=32, 
+                                    bg=self.card_bg, highlightthickness=0)
+            heart_canvas.pack(side=tk.RIGHT, padx=8)
             
-            # Draw a heart shape on the canvas
-            heart_canvas.create_polygon(15, 7, 10, 3, 5, 7, 3, 12, 5, 17, 15, 25, 25, 17, 
-                                      27, 12, 25, 7, 20, 3, 15, 7, 
-                                      fill=self.accent_color, outline="")
+            # Draw a heart shape on the canvas with smoother edges
+            heart_canvas.create_polygon(16, 8, 11, 4, 6, 8, 4, 13, 6, 18, 16, 26, 26, 18, 
+                                      28, 13, 26, 8, 21, 4, 16, 8, 
+                                      fill=self.accent_color, outline="", smooth=True)
             heart_canvas.bind("<Button-1>", lambda e: self.open_patreon())
             
             # Add tooltip to the heart icon
@@ -242,57 +272,116 @@ class ScriptExplorer(tk.Tk):
         except Exception as e:
             print(f"Error creating heart icon: {e}")
         
-        # Admin button
-        self.admin_button = ttk.Button(self.controls_frame, text="", 
-                                      command=self.request_admin_elevation)
-        self.admin_button.pack(side=tk.RIGHT, padx=5)
+        # Admin button with clearer icon indicator
+        self.admin_button = ttk.Button(self.button_row1, 
+                                     text="🔐 Admin", 
+                                     style="Admin.TButton",
+                                     command=self.request_admin_elevation)
+        self.admin_button.pack(side=tk.RIGHT, padx=6)
+        
+        # New Script button - most important action in row 1
+        self.new_script_btn = ttk.Button(self.button_row1, 
+                                       text="➕ New Script", 
+                                       style="Success.TButton",
+                                       command=self.create_new_script)
+        self.new_script_btn.pack(side=tk.RIGHT, padx=6)
+        
+        # Row 2 buttons - secondary actions
+        # GitHub Download button
+        self.github_btn = ttk.Button(self.button_row2, 
+                                   text="📥 Download Scripts", 
+                                   style="Secondary.TButton",
+                                   command=lambda: self.github_controller.show_download_dialog())
+        self.github_btn.pack(side=tk.RIGHT, padx=6, pady=4)
         
         # Check Directories button
-        self.check_dirs_btn = ttk.Button(self.controls_frame, 
-                                        text="Check Directories", 
-                                        command=self.check_and_create_directories)
-        self.check_dirs_btn.pack(side=tk.RIGHT, padx=5)
+        self.check_dirs_btn = ttk.Button(self.button_row2, 
+                                       text="📁 Check Dirs", 
+                                       style="Secondary.TButton",
+                                       command=self.check_and_create_directories)
+        self.check_dirs_btn.pack(side=tk.RIGHT, padx=6, pady=4)
         
-        # GitHub Download button
-        self.github_btn = ttk.Button(self.controls_frame, 
-                                  text="Download Scripts from GitHub", 
-                                  command=lambda: self.github_controller.show_download_dialog())
-        self.github_btn.pack(side=tk.RIGHT, padx=5)
-        
-        # New Script button
-        self.new_script_btn = ttk.Button(self.controls_frame, 
-                                        text="New Script", 
-                                        command=self.create_new_script)
-        self.new_script_btn.pack(side=tk.RIGHT, padx=5)
+        # Add responsive behavior to the header
+        self.bind("<Configure>", self.on_header_resize)
 
     def create_content_frame(self):
-        """Create the main content with paned windows"""
-        self.content_pane = ttk.PanedWindow(self.main_frame, orient=tk.HORIZONTAL)
-        self.content_pane.pack(fill=tk.BOTH, expand=True)
+        """Create the main content with responsive paned windows"""
+        # Create a container frame to hold both desktop and mobile layouts
+        self.content_container = ttk.Frame(self.main_frame)
+        self.content_container.pack(fill=tk.BOTH, expand=True)
         
-        # Left pane - Categories
-        self.left_pane = ttk.Frame(self.content_pane, width=250)
+        # Desktop layout with improved paned windows
+        self.desktop_layout = ttk.Frame(self.content_container)
+        self.desktop_layout.pack(fill=tk.BOTH, expand=True)
+        
+        # Modern styled paned window with thinner sash
+        self.content_pane = ttk.PanedWindow(self.desktop_layout, 
+                                         orient=tk.HORIZONTAL,
+                                         style="TPanedwindow")
+        self.content_pane.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
+        
+        # Left pane - Categories with card-like elevation
+        self.left_pane = ttk.Frame(self.content_pane, width=280, style="Card.TFrame")
         self.content_pane.add(self.left_pane, weight=1)
         
+        # Add category header with icon
+        self.category_header = ttk.Frame(self.left_pane, style="Card.TFrame")
+        self.category_header.pack(fill=tk.X, padx=8, pady=8)
+        
+        ttk.Label(self.category_header, 
+                 text="📂 Categories", 
+                 font=(self.font_family, self.font_size_large, "bold"),
+                 foreground=self.primary_color,
+                 background=self.card_bg,
+                 style="Heading.TLabel").pack(side=tk.LEFT, anchor=tk.W)
+        
+        # Add category button with plus icon
+        self.add_category_btn = ttk.Button(self.category_header, 
+                                        text="➕", 
+                                        width=3,
+                                        style="Icon.TButton",
+                                        command=lambda: self.category_view.add_new_category())
+        self.add_category_btn.pack(side=tk.RIGHT)
+        
         # Right side with scripts list and console output
-        self.right_pane = ttk.PanedWindow(self.content_pane, orient=tk.VERTICAL)
+        self.right_pane = ttk.PanedWindow(self.content_pane, 
+                                       orient=tk.VERTICAL,
+                                       style="TPanedwindow")
         self.content_pane.add(self.right_pane, weight=3)
         
-        # Category view component
+        # Category view component with modern styling
         self.category_view = CategoryView(self.left_pane, self.base_dir, 
-                                     primary_color=self.primary_color,
-                                     secondary_color=self.secondary_color)
-        self.category_view.frame.pack(fill=tk.BOTH, expand=True)
+                                       primary_color=self.primary_color,
+                                       secondary_color=self.secondary_color)
+        self.category_view.frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 8))
         
         # Set category selection callback
         self.category_view.set_selection_callback(self.on_category_select)
         
-        # Scripts view component
-        self.scripts_frame = ttk.Frame(self.right_pane)
+        # Scripts view component with card-like elevation
+        self.scripts_frame = ttk.Frame(self.right_pane, style="Card.TFrame")
         self.right_pane.add(self.scripts_frame, weight=2)
         
-        self.script_view = ScriptView(self.scripts_frame, primary_color=self.primary_color, rating_system=self.rating_system)
-        self.script_view.frame.pack(fill=tk.BOTH, expand=True)
+        # Add scripts header with icon and improved search
+        self.scripts_header = ttk.Frame(self.scripts_frame, style="Card.TFrame")
+        self.scripts_header.pack(fill=tk.X, padx=8, pady=8)
+        
+        self.scripts_title = ttk.Label(self.scripts_header, 
+                                     text="📄 Scripts", 
+                                     font=(self.font_family, self.font_size_large, "bold"),
+                                     foreground=self.primary_color,
+                                     background=self.card_bg,
+                                     style="Heading.TLabel")
+        self.scripts_title.pack(side=tk.LEFT, anchor=tk.W)
+        
+        # Search container with better styling
+        self.search_container = ttk.Frame(self.scripts_header, style="Card.TFrame")
+        self.search_container.pack(side=tk.RIGHT)
+        
+        self.script_view = ScriptView(self.scripts_frame, 
+                                   primary_color=self.primary_color, 
+                                   rating_system=self.rating_system)
+        self.script_view.frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 8))
         
         # Connect the search functionality
         self.script_view.search_var.trace_add("write", lambda *args: self.on_search_changed())
@@ -304,17 +393,26 @@ class ScriptExplorer(tk.Tk):
             right_click_callback=self.on_script_right_click
         )
         
-        # Console view component
-        self.console_frame = ttk.Frame(self.right_pane)
+        # Console view component with improved styling
+        self.console_frame = ttk.Frame(self.right_pane, style="Card.TFrame")
         self.right_pane.add(self.console_frame, weight=1)
         
-        self.console_view = ConsoleView(self.console_frame, 
-                                    primary_color=self.primary_color,
-                                    bg_dark=self.bg_dark)
-        self.console_view.frame.pack(fill=tk.BOTH, expand=True)
+        # Console will create its own header internally
         
-        # Create command input and connect to controller
+        self.console_view = ConsoleView(self.console_frame, 
+                                     primary_color=self.primary_color,
+                                     bg_dark=self.bg_dark)
+        self.console_view.frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 8))
+        
+        # Create command input and connect to controller with improved styling
         self.command_entry = self.console_view.create_command_input(self.execute_command)
+        
+        # Create mobile layout container (initially hidden)
+        self.mobile_layout = ttk.Frame(self.content_container)
+        # We'll initialize and show this in the on_window_resize method when needed
+        
+        # Add methods for responsive layout
+        self.is_small_screen = False
         
     def initialize_components(self):
         """Initialize components with data"""
@@ -552,11 +650,42 @@ class ScriptExplorer(tk.Tk):
                 self.script_view.load_scripts(category_path, category_name)
     
     def execute_command(self, event=None):
-        """Execute a command from the command input"""
+        """Execute a command from the command input and track in history"""
         command = self.command_entry.get().strip()
         if command:
-            self.script_controller.execute_command(command)
-            self.command_entry.delete(0, tk.END)
+            # Add to command history if not empty
+            try:
+                # Add to console view history
+                if hasattr(self.console_view, 'command_history'):
+                    # Avoid duplicate consecutive commands
+                    if not self.console_view.command_history or self.console_view.command_history[-1] != command:
+                        self.console_view.command_history.append(command)
+                        # Limit history size
+                        if len(self.console_view.command_history) > 50:
+                            self.console_view.command_history = self.console_view.command_history[-50:]
+                    # Reset history position
+                    self.console_view.history_position = -1
+                
+                # Also add to mobile view history if it exists
+                if hasattr(self, 'console_view_mobile') and hasattr(self.console_view_mobile, 'command_history'):
+                    if not self.console_view_mobile.command_history or self.console_view_mobile.command_history[-1] != command:
+                        self.console_view_mobile.command_history.append(command)
+                        if len(self.console_view_mobile.command_history) > 50:
+                            self.console_view_mobile.command_history = self.console_view_mobile.command_history[-50:]
+                    self.console_view_mobile.history_position = -1
+                
+                # Execute the command
+                self.script_controller.execute_command(command)
+                
+                # Clear command input
+                self.command_entry.delete(0, tk.END)
+                
+            except Exception as e:
+                print(f"Error executing command: {str(e)}")
+                MessageHandler.error(f"Error executing command: {str(e)}")
+                
+            # Make sure command input keeps focus
+            self.command_entry.focus_set()
     
     def toggle_github_auth(self):
         """Toggle GitHub authentication state"""
@@ -588,13 +717,186 @@ class ScriptExplorer(tk.Tk):
                         console_only=False
                     )
 
+    def on_window_resize(self, event):
+        """Handle window resize events for responsive UI"""
+        # Only respond to window size changes from the main window
+        if event.widget != self:
+            return
+            
+        # Get current window dimensions
+        width = event.width
+        
+        # Determine if we need to switch layouts based on width
+        if width < 1000 and not self.is_small_screen:
+            self.switch_to_mobile_layout()
+        elif width >= 1000 and self.is_small_screen:
+            self.switch_to_desktop_layout()
+            
+        # Call header resize handler
+        self.on_header_resize(event)
+            
+    def on_header_resize(self, event):
+        """Handle header resizing to be responsive"""
+        # Only respond to window size changes from the main window
+        if event.widget != self:
+            return
+            
+        width = event.width
+        
+        # Adapt header for different screen sizes
+        if width < 1200 and hasattr(self, 'app_subtitle'):
+            # Hide subtitle on smaller screens
+            self.app_subtitle.pack_forget()
+            
+            # Make button text shorter
+            if hasattr(self, 'github_btn'):
+                self.github_btn.config(text="📥 Download")
+                
+            if hasattr(self, 'check_dirs_btn'):
+                self.check_dirs_btn.config(text="📁 Dirs")
+                
+        elif width >= 1200 and hasattr(self, 'app_subtitle'):
+            # Show subtitle on larger screens
+            self.app_subtitle.pack(side=tk.LEFT, padx=5)
+            
+            # Restore full button text
+            if hasattr(self, 'github_btn'):
+                self.github_btn.config(text="📥 Download Scripts")
+                
+            if hasattr(self, 'check_dirs_btn'):
+                self.check_dirs_btn.config(text="📁 Check Dirs")
+                
+        # Extra compact mode for very narrow screens
+        if width < 900:
+            # Stack the button rows vertically if they exist
+            if hasattr(self, 'button_row1') and hasattr(self, 'button_row2'):
+                self.button_row1.pack(side=tk.TOP, fill=tk.X, pady=(0, 4))
+                self.button_row2.pack(side=tk.TOP, fill=tk.X)
+        else:
+            # Place button rows side by side if they exist
+            if hasattr(self, 'button_row1') and hasattr(self, 'button_row2'):
+                self.button_row1.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 8))
+                self.button_row2.pack(side=tk.LEFT, fill=tk.Y)
+    
+    def switch_to_mobile_layout(self):
+        """Switch to mobile-friendly layout with tabbed interface"""
+        if self.is_small_screen:
+            return
+            
+        # Hide desktop layout
+        self.desktop_layout.pack_forget()
+        
+        # Initialize mobile layout if needed
+        if not hasattr(self, 'mobile_initialized') or not self.mobile_initialized:
+            # Create notebook for tabbed interface
+            self.mobile_notebook = ttk.Notebook(self.mobile_layout)
+            self.mobile_notebook.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
+            
+            # Categories tab
+            self.mobile_categories_frame = ttk.Frame(self.mobile_notebook, style="Card.TFrame")
+            self.category_view_mobile = CategoryView(self.mobile_categories_frame, 
+                                                self.base_dir,
+                                                self.primary_color, 
+                                                self.secondary_color)
+            self.category_view_mobile.frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
+            
+            # Scripts tab
+            self.mobile_scripts_frame = ttk.Frame(self.mobile_notebook, style="Card.TFrame")
+            self.script_view_mobile = ScriptView(self.mobile_scripts_frame, 
+                                              self.primary_color, 
+                                              self.rating_system)
+            self.script_view_mobile.frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
+            
+            # Console tab
+            self.mobile_console_frame = ttk.Frame(self.mobile_notebook, style="Card.TFrame")
+            self.console_view_mobile = ConsoleView(self.mobile_console_frame, 
+                                               self.primary_color, 
+                                               self.bg_dark)
+            self.console_view_mobile.frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
+            
+            # Add command input to console
+            self.command_entry_mobile = self.console_view_mobile.create_command_input(self.execute_command)
+            
+            # Add tabs to notebook with icons
+            self.mobile_notebook.add(self.mobile_categories_frame, text="📂 Categories")
+            self.mobile_notebook.add(self.mobile_scripts_frame, text="📄 Scripts")
+            self.mobile_notebook.add(self.mobile_console_frame, text="🖥️ Console")
+            
+            # Set up callbacks for mobile view
+            self.category_view_mobile.set_selection_callback(self.on_mobile_category_select)
+            self.script_view_mobile.set_callbacks(
+                double_click_callback=self.on_script_double_click,
+                right_click_callback=self.on_script_right_click
+            )
+            
+            # Initialize with same data as desktop view
+            self.category_view_mobile.initialize_categories(self.categories)
+            
+            # Mark as initialized
+            self.mobile_initialized = True
+        
+        # Show mobile layout
+        self.mobile_layout.pack(fill=tk.BOTH, expand=True)
+        self.is_small_screen = True
+        
+        # Update status
+        print("Switched to mobile layout")
+        
+    def switch_to_desktop_layout(self):
+        """Switch back to desktop layout with paned windows"""
+        if not self.is_small_screen:
+            return
+            
+        # Hide mobile layout
+        self.mobile_layout.pack_forget()
+        
+        # Show desktop layout
+        self.desktop_layout.pack(fill=tk.BOTH, expand=True)
+        self.is_small_screen = False
+        
+        # Update status
+        print("Switched to desktop layout")
+        
+    def on_mobile_category_select(self, event):
+        """Handle category selection in mobile layout"""
+        category_path, category_name = self.category_view_mobile.get_selected_category()
+        if category_path and category_name:
+            # Load scripts for the selected category
+            self.script_view_mobile.load_scripts(category_path, category_name)
+            
+            # Automatically switch to scripts tab
+            self.mobile_notebook.select(1)  # Scripts tab index
+            
     def update_github_auth_status(self):
-        """Update the UI to reflect GitHub authentication status"""
+        """Update the UI to reflect GitHub authentication status with modern styling"""
         try:
             if self.github_auth.is_authenticated():
-                self.menu_bar.update_github_auth_label(f"Sign Out ({self.github_auth.user_info['login']})")
+                # Update menu label with username
+                self.menu_bar.update_github_auth_label(f"🔓 Sign Out ({self.github_auth.user_info['login']})")
+                
+                # Update any other GitHub status indicators in the UI
+                if hasattr(self, 'github_status_label'):
+                    username = self.github_auth.user_info['login']
+                    self.github_status_label.config(
+                        text=f"GitHub: {username}",
+                        foreground=self.success_color
+                    )
+                
+                if hasattr(self, 'github_login_btn'):
+                    self.github_login_btn.config(text="🔓 Logout")
             else:
-                self.menu_bar.update_github_auth_label("Sign In with GitHub")
+                # Update for logged out state
+                self.menu_bar.update_github_auth_label("🔒 Sign In with GitHub")
+                
+                # Update any other GitHub status indicators in the UI
+                if hasattr(self, 'github_status_label'):
+                    self.github_status_label.config(
+                        text="GitHub: Not logged in",
+                        foreground=self.text_secondary
+                    )
+                
+                if hasattr(self, 'github_login_btn'):
+                    self.github_login_btn.config(text="🔒 Login")
         except Exception as e:
             print(f"Error updating GitHub auth status: {str(e)}")
     
