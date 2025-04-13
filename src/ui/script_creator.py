@@ -1,314 +1,162 @@
 """
 Script Creator module
-Modern responsive dialog for creating new scripts with templates
+Dialog for creating new scripts with templates
 """
 
 import os
-import sys
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 from tkinter.ttk import Scrollbar
 
 def create_new_script_dialog(parent, category, category_dir, refresh_callback):
-    """Create a new script in the selected category with a modern responsive UI"""
+    """Create a new script in the selected category"""
     
-    try:
-        # Try to get modern styling from parent app
-        primary_color = parent.primary_color
-        primary_light = parent.primary_light
-        primary_dark = parent.primary_dark
-        secondary_color = parent.secondary_color
-        accent_color = parent.accent_color
-        text_color = parent.text_color
-        text_secondary = parent.text_secondary
-        bg_light = parent.bg_light
-        card_bg = parent.card_bg
-        border_color = parent.border_color
-        success_color = parent.success_color
-        warning_color = parent.warning_color
-        error_color = parent.error_color
-        font_family = parent.font_family
-        font_size_small = parent.font_size_small
-        font_size_normal = parent.font_size_normal
-        font_size_large = parent.font_size_large
-        font_size_xlarge = parent.font_size_xlarge
-    except AttributeError:
-        # Fallbacks if we can't get parent styling
-        primary_color = "#3F51B5"
-        primary_light = "#7986CB"
-        primary_dark = "#303F9F"
-        secondary_color = "#F5F5F5"
-        accent_color = "#FF4081"
-        text_color = "#212121"
-        text_secondary = "#757575"
-        bg_light = "#FFFFFF"
-        card_bg = "#FFFFFF"
-        border_color = "#E0E0E0"
-        success_color = "#4CAF50"
-        warning_color = "#FF9800"
-        error_color = "#F44336"
-        font_family = _get_system_font()
-        font_size_small = 9
-        font_size_normal = 10
-        font_size_large = 12
-        font_size_xlarge = 14
+    # Get parent's color scheme
+    primary_color = parent.primary_color
+    secondary_color = parent.secondary_color
+    accent_color = parent.accent_color
+    text_color = parent.text_color
+    bg_light = parent.bg_light
     
-    # Create a responsive dialog
     dialog = tk.Toplevel(parent)
     dialog.title("Create New Script")
-    dialog.geometry("650x680") 
-    dialog.minsize(400, 500)  # Set minimum size for better UX
+    dialog.geometry("650x750")  # Larger size for better spacing
     dialog.transient(parent)  # Make dialog modal
     dialog.grab_set()
     dialog.configure(bg=secondary_color)
     
     # Center the dialog on the parent window
     x = parent.winfo_x() + (parent.winfo_width() // 2) - (650 // 2)
-    y = parent.winfo_y() + (parent.winfo_height() // 2) - (680 // 2)
+    y = parent.winfo_y() + (parent.winfo_height() // 2) - (580 // 2)
     dialog.geometry(f"+{x}+{y}")
     
-    # Create scrollable main container for smaller screens
-    main_container = ttk.Frame(dialog)
-    main_container.pack(fill=tk.BOTH, expand=True)
+    # Create a frame with padding
+    form_frame = ttk.Frame(dialog, padding=20)
+    form_frame.pack(fill=tk.BOTH, expand=True)
     
-    # Main canvas with scrollbar for content
-    main_canvas = tk.Canvas(main_container, bg=secondary_color, highlightthickness=0)
-    main_scrollbar = ttk.Scrollbar(main_container, orient=tk.VERTICAL, command=main_canvas.yview)
-    main_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-    main_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-    main_canvas.configure(yscrollcommand=main_scrollbar.set)
+    # Title with category info
+    header_frame = ttk.Frame(form_frame)
+    header_frame.pack(fill=tk.X, pady=(0, 20))
     
-    # Create scrollable form container
-    form_container = ttk.Frame(main_canvas, style="Card.TFrame", padding=16)
-    form_window = main_canvas.create_window((0, 0), window=form_container, anchor=tk.NW, width=dialog.winfo_width()-30)
+    ttk.Label(header_frame, 
+             text="Create New Script", 
+             font=("Segoe UI", 16, "bold"),
+             foreground=primary_color).pack(side=tk.LEFT)
     
-    # Set up scrollable region
-    def configure_scroll_region(event):
-        main_canvas.configure(scrollregion=main_canvas.bbox("all"))
-        
-    form_container.bind("<Configure>", configure_scroll_region)
-    
-    # Handle window resize for responsive behavior
-    def on_dialog_resize(event):
-        canvas_width = event.width - 20
-        main_canvas.itemconfig(form_window, width=canvas_width)
-        
-    dialog.bind("<Configure>", on_dialog_resize)
-    
-    # Bind mousewheel for scrolling
-    def on_mousewheel(event):
-        main_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-        
-    main_canvas.bind_all("<MouseWheel>", on_mousewheel)
-    
-    # Modern header with card style
-    header_card = ttk.Frame(form_container, style="Card.TFrame", padding=12)
-    header_card.pack(fill=tk.X, pady=(0, 16))
-    
-    # Title with category info and modern styling
-    ttk.Label(header_card, 
-             text="✨ Create New Script", 
-             font=(font_family, font_size_xlarge, "bold"),
-             foreground=primary_color,
-             background=card_bg,
-             style="Heading.TLabel").pack(side=tk.LEFT)
-    
-    ttk.Label(header_card,
+    ttk.Label(header_frame,
              text=f"Category: {category}",
-             font=(font_family, font_size_normal, "bold"),
-             foreground=text_secondary,
-             background=card_bg).pack(side=tk.RIGHT)
+             font=("Segoe UI", 12)).pack(side=tk.RIGHT)
     
-    # Form card
-    form_card = ttk.Frame(form_container, style="Card.TFrame", padding=16)
-    form_card.pack(fill=tk.X, pady=(0, 16))
+    # Input fields in a grid
+    input_frame = ttk.Frame(form_frame)
+    input_frame.pack(fill=tk.X, pady=(0, 15))
     
-    # Grid container for form fields with responsive layout
-    field_grid = ttk.Frame(form_card, style="Card.TFrame")
-    field_grid.pack(fill=tk.X, expand=True)
-    
-    row = 0
-    # Script Name with modern label and input
-    ttk.Label(field_grid, 
-             text="Script Name", 
-             font=(font_family, font_size_normal, "bold"),
-             foreground=text_color,
-             background=card_bg).grid(row=row, column=0, sticky=tk.W, pady=(0, 4))
-    
+    # Script Name
+    ttk.Label(input_frame, 
+             text="Script Name:", 
+             font=("Segoe UI", 10, "bold")).grid(row=0, column=0, sticky=tk.W, pady=10)
     script_name_var = tk.StringVar()
-    script_name_entry = ttk.Entry(field_grid, 
-                               textvariable=script_name_var, 
-                               width=40, 
-                               font=(font_family, font_size_normal),
-                               style="Search.TEntry")
-    script_name_entry.grid(row=row+1, column=0, sticky=tk.EW, pady=(0, 12), padx=(0, 8))
+    script_name_entry = ttk.Entry(input_frame, textvariable=script_name_var, width=40, font=("Segoe UI", 10))
+    script_name_entry.grid(row=0, column=1, sticky=tk.W, pady=10, padx=(10, 0))
     
-    # Script Type with modern dropdown
-    ttk.Label(field_grid, 
-             text="Script Type", 
-             font=(font_family, font_size_normal, "bold"),
-             foreground=text_color,
-             background=card_bg).grid(row=row, column=1, sticky=tk.W, pady=(0, 4))
+    # Developer
+    ttk.Label(input_frame, 
+             text="Developer:", 
+             font=("Segoe UI", 10, "bold")).grid(row=1, column=0, sticky=tk.W, pady=10)
+    developer_var = tk.StringVar(value="MikeTheTech")  # Default value
+    developer_entry = ttk.Entry(input_frame, textvariable=developer_var, width=40, font=("Segoe UI", 10))
+    developer_entry.grid(row=1, column=1, sticky=tk.W, pady=10, padx=(10, 0))
     
+    # Developer Link
+    ttk.Label(input_frame, 
+             text="Developer Link:", 
+             font=("Segoe UI", 10, "bold")).grid(row=2, column=0, sticky=tk.W, pady=10)
+    link_var = tk.StringVar(value="https://github.com/itsmikethetech")  # Default value
+    link_entry = ttk.Entry(input_frame, textvariable=link_var, width=50, font=("Segoe UI", 10))
+    link_entry.grid(row=2, column=1, sticky=tk.W, pady=10, padx=(10, 0))
+    
+    # Script Type
+    ttk.Label(input_frame, 
+             text="Script Type:", 
+             font=("Segoe UI", 10, "bold")).grid(row=3, column=0, sticky=tk.W, pady=10)
     script_type_var = tk.StringVar(value=".py")
-    script_type_combo = ttk.Combobox(field_grid, 
+    script_type_combo = ttk.Combobox(input_frame, 
                                     textvariable=script_type_var, 
                                     values=[".py", ".ps1", ".bat", ".cmd", ".exe"], 
                                     width=15,
-                                    font=(font_family, font_size_normal),
+                                    font=("Segoe UI", 10),
                                     state="readonly")
-    script_type_combo.grid(row=row+1, column=1, sticky=tk.W, pady=(0, 12))
+    script_type_combo.grid(row=3, column=1, sticky=tk.W, pady=10, padx=(10, 0))
     
-    row += 2
-    # Developer
-    ttk.Label(field_grid, 
-             text="Developer", 
-             font=(font_family, font_size_normal, "bold"),
-             foreground=text_color,
-             background=card_bg).grid(row=row, column=0, sticky=tk.W, pady=(0, 4))
-    
-    developer_var = tk.StringVar(value="MikeTheTech")  # Default value
-    developer_entry = ttk.Entry(field_grid, 
-                             textvariable=developer_var, 
-                             width=40, 
-                             font=(font_family, font_size_normal),
-                             style="Search.TEntry")
-    developer_entry.grid(row=row+1, column=0, columnspan=2, sticky=tk.EW, pady=(0, 12))
-    
-    row += 2
-    # Developer Link
-    ttk.Label(field_grid, 
-             text="Developer Link", 
-             font=(font_family, font_size_normal, "bold"),
-             foreground=text_color,
-             background=card_bg).grid(row=row, column=0, sticky=tk.W, pady=(0, 4))
-    
-    link_var = tk.StringVar(value="https://github.com/itsmikethetech")  # Default value
-    link_entry = ttk.Entry(field_grid, 
-                        textvariable=link_var, 
-                        width=50, 
-                        font=(font_family, font_size_normal),
-                        style="Search.TEntry")
-    link_entry.grid(row=row+1, column=0, columnspan=2, sticky=tk.EW, pady=(0, 12))
-    
-    row += 2
     # Description
-    ttk.Label(field_grid, 
-             text="Description", 
-             font=(font_family, font_size_normal, "bold"),
-             foreground=text_color,
-             background=card_bg).grid(row=row, column=0, sticky=tk.W, pady=(0, 4))
-    
+    ttk.Label(input_frame, 
+             text="Description:", 
+             font=("Segoe UI", 10, "bold")).grid(row=4, column=0, sticky=tk.W, pady=10)
     description_var = tk.StringVar()
-    description_entry = ttk.Entry(field_grid, 
-                               textvariable=description_var, 
-                               width=50, 
-                               font=(font_family, font_size_normal),
-                               style="Search.TEntry")
-    description_entry.grid(row=row+1, column=0, columnspan=2, sticky=tk.EW, pady=(0, 12))
+    description_entry = ttk.Entry(input_frame, textvariable=description_var, width=50, font=("Segoe UI", 10))
+    description_entry.grid(row=4, column=1, sticky=tk.W, pady=10, padx=(10, 0))
     
-    row += 2
-    # Undoable option with improved UI
-    undoable_row = ttk.Frame(field_grid, style="Card.TFrame")
-    undoable_row.grid(row=row, column=0, columnspan=2, sticky=tk.EW, pady=(0, 6))
+    # Undoable with tooltip
+    undoable_frame = ttk.Frame(input_frame)
+    undoable_frame.grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=10)
     
     undoable_var = tk.BooleanVar(value=False)
-    undoable_check = ttk.Checkbutton(undoable_row, 
+    undoable_check = ttk.Checkbutton(undoable_frame, 
                                     text="Script is undoable", 
                                     variable=undoable_var,
                                     style="TCheckbutton")
     undoable_check.pack(side=tk.LEFT)
     
-    # Info icon with tooltip for better UX
+    # Info icon with tooltip
+    info_label = ttk.Label(undoable_frame, text="ℹ️", cursor="hand2")
+    info_label.pack(side=tk.LEFT, padx=5)
+    
+    # Create tooltip for the info icon
     from src.ui.tooltip import ToolTip
-    info_icon = ttk.Label(undoable_row, 
-                        text="ℹ️", 
-                        cursor="hand2",
-                        background=card_bg)
-    info_icon.pack(side=tk.LEFT, padx=5)
+    undo_tooltip = ToolTip(info_label)
+    info_label.bind("<Enter>", lambda e: undo_tooltip.showtip(
+        "Undoable scripts can be reverted after execution. This requires implementing the undo logic in your script."))
+    info_label.bind("<Leave>", lambda e: undo_tooltip.hidetip())
     
-    # Enhanced tooltip with clearer text
-    undo_tooltip = ToolTip(info_icon, wrap_length=350)
-    info_icon.bind("<Enter>", lambda e: undo_tooltip.showtip(
-        "Undoable scripts can be reverted after execution. This requires implementing the undo logic in your script. Check this option if your script will support being undone."))
-    info_icon.bind("<Leave>", lambda e: undo_tooltip.hidetip())
-    
-    row += 1
     # Undo Description
-    undo_desc_label = ttk.Label(field_grid, 
-                              text="Undo Description", 
-                              font=(font_family, font_size_normal, "bold"),
-                              foreground=text_color,
-                              background=card_bg)
-    undo_desc_label.grid(row=row, column=0, sticky=tk.W, pady=(6, 4))
-    
+    ttk.Label(input_frame, 
+             text="Undo Description:", 
+             font=("Segoe UI", 10, "bold")).grid(row=6, column=0, sticky=tk.W, pady=10)
     undo_desc_var = tk.StringVar()
-    undo_desc_entry = ttk.Entry(field_grid, 
-                             textvariable=undo_desc_var, 
-                             width=50, 
-                             font=(font_family, font_size_normal),
-                             style="Search.TEntry")
-    undo_desc_entry.grid(row=row+1, column=0, columnspan=2, sticky=tk.EW, pady=(0, 12))
+    undo_desc_entry = ttk.Entry(input_frame, textvariable=undo_desc_var, width=50, font=("Segoe UI", 10))
+    undo_desc_entry.grid(row=6, column=1, sticky=tk.W, pady=10, padx=(10, 0))
     
-    # Set column weight for responsive layout
-    field_grid.columnconfigure(0, weight=3)
-    field_grid.columnconfigure(1, weight=1)
+    # Template Content
+    template_frame = ttk.Frame(form_frame)
+    template_frame.pack(fill=tk.BOTH, expand=True, pady=5, padx=5)
     
-    # Template card
-    template_card = ttk.Frame(form_container, style="Card.TFrame", padding=16)
-    template_card.pack(fill=tk.BOTH, expand=True, pady=(0, 16))
+    ttk.Label(template_frame, 
+             text="Template:", 
+             font=("Segoe UI", 12, "bold"),
+             foreground=primary_color).pack(anchor=tk.W, pady=(0, 5))
     
-    # Template header with better visual hierarchy
-    ttk.Label(template_card, 
-             text="🧩 Template", 
-             font=(font_family, font_size_large, "bold"),
-             foreground=primary_color,
-             background=card_bg,
-             style="Heading.TLabel").pack(anchor=tk.W, pady=(0, 8))
-    
-    # Create a container for the template with improved scrollbar styling
-    template_container = ttk.Frame(template_card, style="Card.TFrame")
+    # Create a frame for the template with both vertical and horizontal scrollbars
+    template_container = ttk.Frame(template_frame)
     template_container.pack(fill=tk.BOTH, expand=True)
     
-    # Add horizontal scrollbar with modern styling
+    # Add horizontal scrollbar
     h_scrollbar = Scrollbar(template_container, orient=tk.HORIZONTAL)
     h_scrollbar.pack(side=tk.BOTTOM, fill=tk.X)
     
-    # Add vertical scrollbar with modern styling
+    # Add vertical scrollbar
     v_scrollbar = Scrollbar(template_container, orient=tk.VERTICAL)
     v_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
     
-    # Try to find a good monospace font
-    def is_font_available(font_name):
-        """Check if a font is available on the system"""
-        try:
-            from tkinter import font
-            return font_name in font.families()
-        except:
-            return False
-            
-    preferred_fonts = ["Cascadia Code", "Consolas", "Courier New"]
-    code_font = "Consolas"  # Default fallback
-    
-    for font in preferred_fonts:
-        if is_font_available(font):
-            code_font = font
-            break
-    
-    # Enhanced template text area with modern styling and syntax highlighting support
+    # Add the template text widget with both scrollbars
     template_text = tk.Text(template_container, 
-                          width=70, 
-                          height=14,
+                          width=78, 
+                          height=15,
                           wrap=tk.NONE,
                           background=bg_light,
                           foreground=text_color,
-                          insertbackground=primary_color,
-                          selectbackground=primary_light,
-                          padx=8, 
-                          pady=8,
-                          borderwidth=1,
-                          relief="solid",
-                          font=(code_font, font_size_normal),
+                          insertbackground=text_color,
+                          selectbackground=primary_color,
+                          font=("Consolas", 10),
                           xscrollcommand=h_scrollbar.set,
                           yscrollcommand=v_scrollbar.set)
     template_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -317,7 +165,7 @@ def create_new_script_dialog(parent, category, category_dir, refresh_callback):
     h_scrollbar.config(command=template_text.xview)
     v_scrollbar.config(command=template_text.yview)
     
-    # Update template based on user input with syntax highlighting
+    # Update template based on user input
     def update_template(*args):
         script_type = script_type_var.get()
         name = script_name_var.get() or "Script Name"
@@ -339,11 +187,9 @@ def create_new_script_dialog(parent, category, category_dir, refresh_callback):
             template_text.config(state="normal")
             undoable_check.config(state="normal")
         
-        # Clear the current template
-        template_text.delete(1.0, tk.END)
-        
         if script_type == ".py":
-            template = f"""# NAME: {name}
+            template_text.delete(1.0, tk.END)
+            template_text.insert(tk.END, f"""# NAME: {name}
 # DEVELOPER: {developer}
 # LINK: {link}
 # DESCRIPTION: {desc}
@@ -376,45 +222,10 @@ def perform_undo():
 
 if __name__ == "__main__":
     main()
-"""
-            template_text.insert(tk.END, template)
-            
-            # Apply syntax highlighting
-            template_text.tag_configure("comment", foreground="#888888")
-            template_text.tag_configure("keyword", foreground="#7986CB")
-            template_text.tag_configure("function", foreground="#4CAF50")
-            template_text.tag_configure("string", foreground="#FF8A65")
-            
-            # Apply highlighting
-            for pattern, tag in [
-                (r"^#.*$", "comment"),
-                (r"\bimport\b|\bif\b|\belse\b|\bdef\b|\breturn\b|\bfor\b|\bin\b|\bwhile\b", "keyword"),
-                (r"\bTrue\b|\bFalse\b|\bNone\b", "keyword"),
-                (r"print\b|argparse\b|ArgumentParser\b|add_argument\b|action\b|parse_args\b", "function"),
-                (r'".*?"', "string"),
-                (r"'.*?'", "string")
-            ]:
-                start_idx = "1.0"
-                while True:
-                    import re
-                    pos = template_text.search(pattern, start_idx, tk.END, regexp=True)
-                    if not pos:
-                        break
-                    
-                    # Find end of match
-                    line, col = pos.split('.')
-                    line_text = template_text.get(f"{line}.0", f"{line}.end")
-                    match = re.search(pattern[1:] if pattern.startswith("^") else pattern, line_text[int(col):])
-                    if match:
-                        end_pos = f"{line}.{int(col) + match.end()}"
-                        template_text.tag_add(tag, pos, end_pos)
-                        start_idx = end_pos
-                    else:
-                        # If no match found, move to next line to avoid infinite loop
-                        start_idx = f"{int(line) + 1}.0"
-                        
+""")
         elif script_type == ".ps1":
-            template = f"""# NAME: {name}
+            template_text.delete(1.0, tk.END)
+            template_text.insert(tk.END, f"""# NAME: {name}
 # DEVELOPER: {developer}
 # LINK: {link}
 # DESCRIPTION: {desc}
@@ -442,11 +253,10 @@ if ($Undo) {{
 }} else {{
     Perform-Action
 }}
-"""
-            template_text.insert(tk.END, template)
-            
+""")
         elif script_type in [".bat", ".cmd"]:
-            template = f""":: NAME: {name}
+            template_text.delete(1.0, tk.END)
+            template_text.insert(tk.END, f""":: NAME: {name}
 :: DEVELOPER: {developer}
 :: LINK: {link}
 :: DESCRIPTION: {desc}
@@ -471,8 +281,7 @@ goto :end
 
 :end
 pause
-"""
-            template_text.insert(tk.END, template)
+""")
             
         if undoable_var.get():
             undo_desc_entry.config(state="normal")
@@ -490,9 +299,9 @@ pause
     
     update_template()
     
-    # Action buttons card
-    buttons_card = ttk.Frame(form_container, style="Card.TFrame", padding=16)
-    buttons_card.pack(fill=tk.X, pady=(0, 16))
+    # Buttons with some extra padding
+    button_frame = ttk.Frame(form_frame)
+    button_frame.pack(fill=tk.X, pady=(20, 10), padx=5)
     
     def create_script():
         name = script_name_var.get().strip()
@@ -526,44 +335,23 @@ pause
             messagebox.showerror("Error", error_msg)
             print(error_msg)
     
-    # Button container for better layout
-    button_container = ttk.Frame(buttons_card)
-    button_container.pack(fill=tk.X)
-    
-    # Left side - cancel
-    ttk.Button(button_container, 
+    ttk.Button(button_frame, 
               text="Cancel", 
-              width=12,
-              style="Secondary.TButton",
-              command=dialog.destroy).pack(side=tk.LEFT, padx=5)
+              width=15,
+              command=dialog.destroy).pack(side=tk.RIGHT, padx=5)
     
-    # Right side - create
-    create_btn = ttk.Button(button_container, 
-                          text="✨ Create Script", 
-                          width=15,
-                          style="Success.TButton",
-                          command=create_script)
+    create_btn = ttk.Button(button_frame, 
+                           text="Create", 
+                           width=15,
+                           command=create_script)
     create_btn.pack(side=tk.RIGHT, padx=5)
     
-    # When dialog is about to close, cleanup event bindings
-    def on_close():
-        main_canvas.unbind_all("<MouseWheel>")
-        dialog.destroy()
+    # The script already has scrollbars for the template text area
+    # but we don't need a full scrollable canvas for the entire dialog
+    # since we've addressed scrolling needs in the template area
     
-    dialog.protocol("WM_DELETE_WINDOW", on_close)
+    # Remove the problematic event binding that was causing errors
+    # dialog.bind("<Configure>", on_dialog_configure)
     
-    # Set focus to the script name entry for immediate typing
+    # Set focus to the script name entry
     script_name_entry.focus_set()
-    
-    # Helper function for system font
-    def _get_system_font():
-        """Get the best font for the current system"""
-        if sys.platform == "win32":
-            return "Segoe UI"
-        elif sys.platform == "darwin":
-            return "San Francisco"
-        else:
-            return "Roboto"
-    
-    # Keep dialog modal
-    dialog.wait_window()
